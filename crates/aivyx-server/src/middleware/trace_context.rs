@@ -80,7 +80,7 @@ pub async fn trace_context_middleware(req: Request<Body>, next: Next) -> Respons
         .unwrap_or("unknown")
         .to_string();
 
-    tracing::Span::current().record("trace_id", &tracing::field::display(&trace_id));
+    tracing::Span::current().record("trace_id", tracing::field::display(&trace_id));
 
     let mut response = next.run(req).await;
 

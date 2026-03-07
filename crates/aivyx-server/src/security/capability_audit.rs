@@ -151,41 +151,41 @@ pub fn audit_agent_capabilities(agents_dir: &Path) -> Result<CapabilityAuditRepo
                 });
 
                 // Check for wildcard shell.
-                if let CapabilityScope::Shell { allowed_commands } = &cap.scope {
-                    if allowed_commands.is_empty() {
-                        warnings.push(CapabilityWarning::WildcardShell {
-                            agent: profile.name.clone(),
-                        });
-                    }
+                if let CapabilityScope::Shell { allowed_commands } = &cap.scope
+                    && allowed_commands.is_empty()
+                {
+                    warnings.push(CapabilityWarning::WildcardShell {
+                        agent: profile.name.clone(),
+                    });
                 }
 
                 // Check for wildcard filesystem (root = /).
-                if let CapabilityScope::Filesystem { root } = &cap.scope {
-                    if root.as_os_str() == "/" {
-                        warnings.push(CapabilityWarning::WildcardFilesystem {
-                            agent: profile.name.clone(),
-                            root: root.display().to_string(),
-                        });
-                    }
+                if let CapabilityScope::Filesystem { root } = &cap.scope
+                    && root.as_os_str() == "/"
+                {
+                    warnings.push(CapabilityWarning::WildcardFilesystem {
+                        agent: profile.name.clone(),
+                        root: root.display().to_string(),
+                    });
                 }
 
                 // Check for wildcard network.
-                if let CapabilityScope::Network { hosts, .. } = &cap.scope {
-                    if hosts.is_empty() {
-                        warnings.push(CapabilityWarning::WildcardNetwork {
-                            agent: profile.name.clone(),
-                        });
-                    }
+                if let CapabilityScope::Network { hosts, .. } = &cap.scope
+                    && hosts.is_empty()
+                {
+                    warnings.push(CapabilityWarning::WildcardNetwork {
+                        agent: profile.name.clone(),
+                    });
                 }
 
                 // Check for unrestricted custom scope (not namespaced).
-                if let CapabilityScope::Custom(s) = &cap.scope {
-                    if !s.contains(':') {
-                        warnings.push(CapabilityWarning::UnrestrictedCustom {
-                            agent: profile.name.clone(),
-                            scope: s.clone(),
-                        });
-                    }
+                if let CapabilityScope::Custom(s) = &cap.scope
+                    && !s.contains(':')
+                {
+                    warnings.push(CapabilityWarning::UnrestrictedCustom {
+                        agent: profile.name.clone(),
+                        scope: s.clone(),
+                    });
                 }
             }
 

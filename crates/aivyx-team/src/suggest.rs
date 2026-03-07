@@ -108,12 +108,11 @@ impl LearnedWeights {
 
         // Check tool success rates for member's tools (cap at 1 bonus from tools)
         for tool in &member.tool_ids {
-            if let Some(&rate) = self.tool_success_rates.get(tool) {
-                if rate > 0.9 {
+            if let Some(&rate) = self.tool_success_rates.get(tool)
+                && rate > 0.9 {
                     bonus += 1;
                     break;
                 }
-            }
         }
 
         // Check role success rate

@@ -350,7 +350,7 @@ async fn run_voice_turn(
         }
     };
 
-    let store = match aivyx_crypto::EncryptedStore::open(&state.dirs.store_path()) {
+    let store = match aivyx_crypto::EncryptedStore::open(state.dirs.store_path()) {
         Ok(s) => s,
         Err(e) => {
             let _ = outgoing_tx
@@ -498,7 +498,7 @@ async fn run_voice_turn(
             None => return, // TTS not configured, skip audio
         };
 
-        let store = match aivyx_crypto::EncryptedStore::open(&state_tts.dirs.store_path()) {
+        let store = match aivyx_crypto::EncryptedStore::open(state_tts.dirs.store_path()) {
             Ok(s) => s,
             Err(_) => return,
         };

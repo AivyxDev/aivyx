@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 
 use aivyx_core::{AivyxError, Result};
 use aivyx_llm::{ChatMessage, ChatRequest, LlmProvider};
-use aivyx_memory::{MemoryEntry, MemoryKind, MemoryManager, OutcomeFilter, OutcomeSource};
+use aivyx_memory::{MemoryKind, MemoryManager, OutcomeFilter, OutcomeSource};
 
 use crate::dag;
 use crate::types::{Step, StepStatus};

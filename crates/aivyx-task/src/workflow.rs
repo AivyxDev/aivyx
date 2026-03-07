@@ -44,9 +44,10 @@ impl WorkflowStatus {
 }
 
 /// Condition that must be met for a stage to execute.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum StageCondition {
     /// Always run this stage (default for the first stage).
+    #[default]
     Always,
     /// Run only if the previous stage succeeded.
     OnSuccess,
@@ -54,11 +55,6 @@ pub enum StageCondition {
     OnFailure,
 }
 
-impl Default for StageCondition {
-    fn default() -> Self {
-        StageCondition::Always
-    }
-}
 
 /// A single stage within a workflow.
 #[derive(Debug, Clone, Serialize, Deserialize)]

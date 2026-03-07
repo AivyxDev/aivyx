@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use aivyx_audit::AuditEvent;
-use aivyx_tenant::{AuthContext, TenantContext, TenantStatus};
+use aivyx_tenant::{AuthContext, TenantStatus};
 
 use crate::app_state::AppState;
 

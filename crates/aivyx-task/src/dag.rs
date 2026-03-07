@@ -80,7 +80,7 @@ pub fn ready_steps(steps: &[Step]) -> Vec<usize> {
             s.depends_on.iter().all(|&dep| {
                 steps
                     .get(dep)
-                    .map_or(false, |d| matches!(d.status, StepStatus::Completed))
+                    .is_some_and(|d| matches!(d.status, StepStatus::Completed))
             })
         })
         .map(|s| s.index)

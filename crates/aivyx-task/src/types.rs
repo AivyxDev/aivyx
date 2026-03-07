@@ -38,10 +38,11 @@ impl TaskStatus {
 }
 
 /// What kind of step this is — determines execution behavior.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind")]
 pub enum StepKind {
     /// Normal execution step (default, backwards-compatible).
+    #[default]
     Execute,
     /// Reflection: re-evaluate a previous step's output.
     Reflect {
@@ -63,11 +64,6 @@ pub enum StepKind {
     },
 }
 
-impl Default for StepKind {
-    fn default() -> Self {
-        StepKind::Execute
-    }
-}
 
 /// Whether a mission uses sequential or DAG-based execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

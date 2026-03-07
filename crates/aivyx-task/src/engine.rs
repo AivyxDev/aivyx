@@ -591,6 +591,7 @@ impl TaskEngine {
     ///
     /// Sends an approval request through the channel adapter (if available)
     /// and waits for a response. Supports timeout with auto-approve/reject.
+    #[allow(clippy::too_many_arguments)]
     async fn execute_approval_step(
         &self,
         mission: &mut Mission,
@@ -815,6 +816,7 @@ impl TaskEngine {
     }
 
     /// Record a step outcome if a memory manager is attached.
+    #[allow(clippy::too_many_arguments)]
     async fn record_step_outcome(
         &self,
         task_id: TaskId,
@@ -837,11 +839,10 @@ impl TaskEngine {
                 agent_name.to_string(),
                 goal.to_string(),
             );
-            if let Ok(mgr) = mgr.try_lock() {
-                if let Err(e) = mgr.record_outcome(&record) {
+            if let Ok(mgr) = mgr.try_lock()
+                && let Err(e) = mgr.record_outcome(&record) {
                     tracing::warn!("Failed to record step outcome: {e}");
                 }
-            }
         }
     }
 
@@ -1174,7 +1175,7 @@ fn truncate(s: &str, max_len: usize) -> String {
 ///
 /// The reflection prompt includes the target step's description and result,
 /// asking the agent to evaluate quality and provide a structured verdict.
-fn build_reflection_prompt(mission: &Mission, step: &Step, target_step: &Step) -> String {
+fn build_reflection_prompt(mission: &Mission, _step: &Step, target_step: &Step) -> String {
     let target_result = target_step
         .result
         .as_deref()

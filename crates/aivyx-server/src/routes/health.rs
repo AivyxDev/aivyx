@@ -23,7 +23,7 @@ pub async fn health() -> impl IntoResponse {
     // rather than AppState to keep the health endpoint stateless
     // (it's outside the auth middleware and doesn't have access to state).
     let instance_id = std::env::var("AIVYX_INSTANCE_ID").ok();
-    let scaling_mode = if std::env::var("AIVYX_STATELESS_MODE").map_or(false, |v| v == "1") {
+    let scaling_mode = if std::env::var("AIVYX_STATELESS_MODE").is_ok_and(|v| v == "1") {
         Some("stateless")
     } else {
         None

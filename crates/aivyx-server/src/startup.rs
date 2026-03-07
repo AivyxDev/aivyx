@@ -383,7 +383,7 @@ pub async fn build_router(state: Arc<AppState>) -> axum::Router {
 
     // --- Chaos fault-injection layer (opt-in via AIVYX_CHAOS_ENABLED=1) ---
     let chaos_config = Arc::new(middleware::chaos::ChaosConfig {
-        enabled: std::env::var("AIVYX_CHAOS_ENABLED").map_or(false, |v| v == "1"),
+        enabled: std::env::var("AIVYX_CHAOS_ENABLED").is_ok_and(|v| v == "1"),
         http_error_probability: std::env::var("AIVYX_CHAOS_HTTP_ERROR_PROB")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -663,15 +663,14 @@ pub fn build_app_state_with_keys(
     Ok(Arc::new(state))
 }
 
-/// Initialize tenant and API key stores when multi-tenancy is enabled.
-fn build_tenant_stores(
-    dirs: &AivyxDirs,
-    config: &AivyxConfig,
-) -> Result<(
+type TenantStores = (
     Option<Arc<aivyx_tenant::TenantStore>>,
     Option<Arc<aivyx_tenant::ApiKeyStore>>,
     bool,
-)> {
+);
+
+/// Initialize tenant and API key stores when multi-tenancy is enabled.
+fn build_tenant_stores(dirs: &AivyxDirs, config: &AivyxConfig) -> Result<TenantStores> {
     let enabled = config
         .tenants
         .as_ref()

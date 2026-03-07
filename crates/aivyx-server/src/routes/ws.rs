@@ -68,6 +68,7 @@ enum ClientMessage {
     TaskApprovalResponse {
         request_id: String,
         approved: bool,
+        #[allow(dead_code)]
         reason: Option<String>,
     },
     /// Keepalive ping.
@@ -105,6 +106,7 @@ enum ServerMessage {
         request_id: String,
     },
     /// Task-level approval gate request.
+    #[allow(dead_code)]
     TaskApprovalRequest {
         task_id: String,
         step_index: usize,

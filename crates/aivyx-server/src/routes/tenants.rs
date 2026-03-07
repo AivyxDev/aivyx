@@ -10,7 +10,7 @@ use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
-use aivyx_tenant::{AivyxRole, ResourceQuotas, TenantDirs, TenantRecord, TenantStatus};
+use aivyx_tenant::{AivyxRole, ResourceQuotas, TenantDirs, TenantStatus};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;

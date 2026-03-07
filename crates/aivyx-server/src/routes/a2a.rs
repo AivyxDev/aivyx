@@ -44,19 +44,19 @@ pub async fn agent_card(State(state): State<Arc<AppState>>) -> impl IntoResponse
     let agents_dir = state.dirs.agents_dir();
     let mut skills = Vec::new();
 
-    if agents_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&agents_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "toml") {
-                    if let Ok(profile) = AgentProfile::load(&path) {
-                        skills.push(AgentSkill {
-                            id: profile.name.clone(),
-                            name: profile.name.clone(),
-                            description: profile.role.clone(),
-                        });
-                    }
-                }
+    if agents_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&agents_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "toml")
+                && let Ok(profile) = AgentProfile::load(&path)
+            {
+                skills.push(AgentSkill {
+                    id: profile.name.clone(),
+                    name: profile.name.clone(),
+                    description: profile.role.clone(),
+                });
             }
         }
     }
@@ -66,11 +66,11 @@ pub async fn agent_card(State(state): State<Arc<AppState>>) -> impl IntoResponse
         .server
         .as_ref()
         .and_then(|s| s.public_url.as_deref())
-        .unwrap_or_else(|| {
+        .unwrap_or(
             // No public_url configured — construct from bind address + port
             // (this is a local fallback; in production, public_url should be set)
-            "http://localhost:3000"
-        });
+            "http://localhost:3000",
+        );
 
     let card = AgentCard {
         name: "Aivyx Engine".to_string(),

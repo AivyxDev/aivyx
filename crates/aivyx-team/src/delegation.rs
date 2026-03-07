@@ -760,11 +760,10 @@ impl Tool for DelegateTaskTool {
                         lead_name.clone(),
                         task_owned.clone(),
                     );
-                    if let Ok(mgr) = mgr.try_lock() {
-                        if let Err(e) = mgr.record_outcome(&record) {
+                    if let Ok(mgr) = mgr.try_lock()
+                        && let Err(e) = mgr.record_outcome(&record) {
                             warn!("Failed to record async delegation outcome: {e}");
                         }
-                    }
                 }
 
                 // Update job tracker
@@ -866,11 +865,10 @@ impl Tool for DelegateTaskTool {
                     self.lead_name.clone(),
                     task.to_string(),
                 );
-                if let Ok(mgr) = mgr.try_lock() {
-                    if let Err(e) = mgr.record_outcome(&record) {
+                if let Ok(mgr) = mgr.try_lock()
+                    && let Err(e) = mgr.record_outcome(&record) {
                         warn!("Failed to record delegation outcome: {e}");
                     }
-                }
             }
         }
 

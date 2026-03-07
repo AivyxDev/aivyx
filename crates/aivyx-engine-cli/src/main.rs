@@ -10,7 +10,7 @@ use clap::Parser;
 async fn main() {
     let env_filter = tracing_subscriber::EnvFilter::from_default_env();
 
-    if std::env::var("AIVYX_LOG_FORMAT").map_or(false, |v| v == "json") {
+    if std::env::var("AIVYX_LOG_FORMAT").is_ok_and(|v| v == "json") {
         tracing_subscriber::fmt()
             .json()
             .with_writer(std::io::stderr)
