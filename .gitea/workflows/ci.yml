@@ -44,7 +44,11 @@ jobs:
             bash -c '
               set -euo pipefail
               apt-get update -qq && apt-get install -y -qq \
-                pkg-config libssl-dev libsqlite3-dev openssh-client > /dev/null 2>&1
+                pkg-config libssl-dev libsqlite3-dev openssh-client git > /dev/null 2>&1
+
+              # Clone aivyx-core as sibling for [patch] path dependencies
+              echo "=== Clone aivyx-core ==="
+              git clone --depth 1 ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git /aivyx-core 2>&1 | tail -2
 
               echo "=== Build ==="
               cargo build --workspace
