@@ -17,6 +17,18 @@ import Layout from '../layouts/Layout.astro';
         <a href="/download" class="btn btn-primary">Download</a>
         <a href="/docs" class="btn btn-secondary">Get Started →</a>
       </div>
+
+      <!-- Hero Stats -->
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-num">7</span><span class="stat-label">Phases Complete</span></div>
+        <div class="stat-sep">·</div>
+        <div class="stat"><span class="stat-num">1,576</span><span class="stat-label">Tests Passing</span></div>
+        <div class="stat-sep">·</div>
+        <div class="stat"><span class="stat-num">90+</span><span class="stat-label">API Endpoints</span></div>
+        <div class="stat-sep">·</div>
+        <div class="stat"><span class="stat-num">46</span><span class="stat-label">Built-in Tools</span></div>
+      </div>
+
       <pre class="hero-terminal"><code><span class="prompt">$</span> aivyx run assistant
 <span class="dim">🕯️ Connecting to Ollama (llama3.2)...</span>
 <span class="dim">🔒 Session encrypted. Audit logging enabled.</span>
@@ -42,8 +54,8 @@ import Layout from '../layouts/Layout.astro';
         </div>
         <div class="feature-card">
           <div class="feature-icon">🧠</div>
-          <h3>Persistent Memory</h3>
-          <p>Semantic knowledge graph that learns and remembers. Your agent builds understanding over time — encrypted, always.</p>
+          <h3>GraphRAG Memory</h3>
+          <p>Knowledge graph with BFS traversal, community detection, and agentic RAG. Agents retrieve, evaluate, and self-correct their context — encrypted, always.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🏠</div>
@@ -51,25 +63,57 @@ import Layout from '../layouts/Layout.astro';
           <p>Runs on your machine with Ollama for fully local inference. Or connect to OpenAI, Anthropic, or Gemini when you need more power.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🛡️</div>
-          <h3>Tamper-Proof Audit</h3>
-          <p>HMAC chain on every action. If anyone modifies a single log entry, the chain breaks. Verify anytime with <code>aivyx audit verify</code>.</p>
+          <div class="feature-icon">🎙️</div>
+          <h3>Voice Agent</h3>
+          <p>Real-time voice via WebSocket — STT, agent reasoning with tools, TTS streaming. Barge-in interruption support. Talk to your agent naturally.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🔧</div>
-          <h3>46 Built-in Tools</h3>
-          <p>Filesystem, git, web, shell, JSON, CSV, diagrams, compliance, PII detection — plus MCP for infinite extensibility.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3>22 Built-in Skills</h3>
-          <p>Code review, deep research, security audit, financial analysis, and more. Structured workflows that produce professional results.</p>
+          <div class="feature-icon">👁️</div>
+          <h3>Vision & Documents</h3>
+          <p>Image understanding via Claude, OpenAI, and Ollama vision models. PDF, XLSX, CSV extraction. Multimodal memory with image embeddings.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🤝</div>
-          <h3>Nonagon Team</h3>
-          <p>9 specialist agents — Coordinator, Researcher, Coder, Reviewer, and more — collaborate on complex missions with capability-scoped autonomy.</p>
+          <h3>A2A + MCP Protocols</h3>
+          <p>Google A2A for agent-to-agent. MCP with OAuth 2.1 for agent-to-tool. Federation for cross-instance collaboration. Industry-standard interop.</p>
         </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔀</div>
+          <h3>DAG Orchestration</h3>
+          <p>Parallel step execution with dependency graphs. Reflection loops with LLM-as-judge. Human-in-the-loop approval checkpoints.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Enterprise Security</h3>
+          <p>Multi-tenancy with per-tenant encryption. RBAC with OIDC SSO. Cost governance with budgets. Prompt injection defense. OWASP-aligned.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Self-Improvement</h3>
+          <p>Outcome tracking, planner feedback loops, specialist recommendation learning, and skill effectiveness scoring. Agents get better over time.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Nonagon Team Preview -->
+  <section class="nonagon-preview">
+    <div class="section-inner">
+      <h2>The <span class="accent">Nonagon</span></h2>
+      <p class="section-sub">9 specialist agents, each with its own identity, tools, and capabilities. The Coordinator decomposes your mission and delegates to the right specialists.</p>
+      <div class="nonagon-grid">
+        <div class="agent-pill"><img src="/images/team/mission-director.png" alt="Coordinator" width="36" height="36" loading="lazy" /><span>Coordinator</span></div>
+        <div class="agent-pill"><img src="/images/team/intelligence-analyst.png" alt="Researcher" width="36" height="36" loading="lazy" /><span>Researcher</span></div>
+        <div class="agent-pill"><img src="/images/team/data-analyst.png" alt="Analyst" width="36" height="36" loading="lazy" /><span>Analyst</span></div>
+        <div class="agent-pill"><img src="/images/team/lead-developer.png" alt="Coder" width="36" height="36" loading="lazy" /><span>Coder</span></div>
+        <div class="agent-pill"><img src="/images/team/quality-auditor.png" alt="Reviewer" width="36" height="36" loading="lazy" /><span>Reviewer</span></div>
+        <div class="agent-pill"><img src="/images/team/creative-writer.png" alt="Writer" width="36" height="36" loading="lazy" /><span>Writer</span></div>
+        <div class="agent-pill"><img src="/images/team/master-architect.png" alt="Planner" width="36" height="36" loading="lazy" /><span>Planner</span></div>
+        <div class="agent-pill"><img src="/images/team/ethics-warden.png" alt="Guardian" width="36" height="36" loading="lazy" /><span>Guardian</span></div>
+        <div class="agent-pill"><img src="/images/team/generalist.png" alt="Executor" width="36" height="36" loading="lazy" /><span>Executor</span></div>
+      </div>
+      <div class="nonagon-cta">
+        <a href="/team" class="btn btn-secondary">Meet the full team →</a>
       </div>
     </div>
   </section>
@@ -89,6 +133,7 @@ import Layout from '../layouts/Layout.astro';
             <li>✦ No telemetry. No analytics. No phone-home.</li>
             <li>✦ Passphrase never stored — only derived keys in memory</li>
             <li>✦ Key material zeroed on process exit</li>
+            <li>✦ Per-tenant HKDF key derivation for multi-tenancy</li>
             <li>✦ Open source — verify every line yourself</li>
           </ul>
         </div>
@@ -105,8 +150,76 @@ import Layout from '../layouts/Layout.astro';
             <div class="privacy-item good">✓ Runs 100% locally</div>
             <div class="privacy-item good">✓ ChaCha20Poly1305 encryption</div>
             <div class="privacy-item good">✓ HMAC tamper-proof audit</div>
+            <div class="privacy-item good">✓ Capability-based security model</div>
             <div class="privacy-item good">✓ You own everything</div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Voice Demo -->
+  <section class="voice-section">
+    <div class="section-inner">
+      <h2>Talk to Your Agent</h2>
+      <p class="section-sub">Real-time voice with WebSocket streaming. STT → Agent reasoning with tools → TTS — all running locally.</p>
+      <div class="voice-flow">
+        <div class="voice-step">
+          <div class="voice-icon">🎤</div>
+          <h3>Listen</h3>
+          <p>Whisper or Ollama transcribes your speech in real-time</p>
+        </div>
+        <div class="voice-arrow">→</div>
+        <div class="voice-step">
+          <div class="voice-icon">🧠</div>
+          <h3>Think</h3>
+          <p>Agent reasons, uses tools, accesses encrypted memory</p>
+        </div>
+        <div class="voice-arrow">→</div>
+        <div class="voice-step">
+          <div class="voice-icon">🔊</div>
+          <h3>Speak</h3>
+          <p>Sentence-chunked TTS streaming with barge-in support</p>
+        </div>
+      </div>
+      <pre class="voice-terminal"><code><span class="prompt">$</span> aivyx voice assistant
+<span class="dim">🎤 Microphone active. Say something...</span>
+
+<span class="you">You:</span> What meetings do I have tomorrow?
+<span class="agent">Aivyx:</span> <span class="dim">[Speaking]</span> You have two meetings tomorrow.
+<span class="dim">   A standup at 9 AM and a design review at 2 PM.</span></code></pre>
+    </div>
+  </section>
+
+  <!-- Enterprise -->
+  <section class="enterprise" id="enterprise">
+    <div class="section-inner">
+      <h2>Enterprise Ready</h2>
+      <p class="section-sub">Ship to production with confidence. Multi-tenant isolation, compliance, and cost control built in.</p>
+      <div class="enterprise-grid">
+        <div class="ent-card">
+          <h3>🏢 Multi-Tenancy</h3>
+          <p>Per-tenant HKDF key derivation, resource quotas, API key management, and isolated directory trees.</p>
+        </div>
+        <div class="ent-card">
+          <h3>🔑 RBAC + SSO</h3>
+          <p>OIDC SSO with group-to-role mapping. Four roles: Billing, Viewer, Operator, Admin. Scoped API tokens.</p>
+        </div>
+        <div class="ent-card">
+          <h3>💰 Cost Governance</h3>
+          <p>Per-agent and per-tenant budgets with daily/monthly limits. Usage analytics API. Cost allocation tags for chargeback.</p>
+        </div>
+        <div class="ent-card">
+          <h3>📡 Webhooks & Workflows</h3>
+          <p>HMAC-signed webhook triggers. Multi-stage workflow engine with conditional branches and failure handling.</p>
+        </div>
+        <div class="ent-card">
+          <h3>☸️ Kubernetes</h3>
+          <p>Production Helm chart with HPA, Ingress, PVC, and secrets. PostgreSQL + Redis backends. Horizontal scaling.</p>
+        </div>
+        <div class="ent-card">
+          <h3>📋 OpenAPI Spec</h3>
+          <p>Hand-authored OpenAPI 3.1.0 covering all 90+ endpoints and 29 tags. Integration guides for Slack, Discord, and custom bots.</p>
         </div>
       </div>
     </div>
@@ -116,7 +229,7 @@ import Layout from '../layouts/Layout.astro';
   <section class="interfaces">
     <div class="section-inner">
       <h2>Your Way</h2>
-      <p class="section-sub">Terminal, GUI, or API — Aivyx meets you where you work.</p>
+      <p class="section-sub">Terminal, GUI, Voice, or API — Aivyx meets you where you work.</p>
       <div class="interface-grid">
         <div class="interface-card">
           <h3>CLI</h3>
@@ -132,6 +245,11 @@ import Layout from '../layouts/Layout.astro';
           <h3>Desktop</h3>
           <pre><code>Tauri v2 native app</code></pre>
           <p>Visual setup wizard, chat interface, and agent management.</p>
+        </div>
+        <div class="interface-card">
+          <h3>Voice</h3>
+          <pre><code>$ aivyx voice assistant</code></pre>
+          <p>Real-time voice agent via WebSocket with STT/TTS streaming.</p>
         </div>
       </div>
     </div>
@@ -203,8 +321,41 @@ import Layout from '../layouts/Layout.astro';
     display: flex;
     gap: 1rem;
     justify-content: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
   }
+
+  /* Hero Stats */
+  .hero-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .stat-num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .stat-sep {
+    color: var(--border);
+    font-size: 1.5rem;
+    margin-top: -0.75rem;
+  }
+
   .btn {
     display: inline-block;
     padding: 0.75rem 1.75rem;
@@ -233,7 +384,7 @@ import Layout from '../layouts/Layout.astro';
     border-color: var(--accent);
     color: var(--accent);
   }
-  .hero-terminal {
+  .hero-terminal, .voice-terminal {
     text-align: left;
     max-width: 650px;
     margin: 0 auto;
@@ -293,8 +444,48 @@ import Layout from '../layouts/Layout.astro';
     line-height: 1.5;
   }
 
-  .privacy {
+  /* Nonagon Preview */
+  .nonagon-preview {
     background: var(--surface);
+  }
+  .nonagon-grid {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .agent-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.5rem 1.25rem 0.5rem 0.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .agent-pill:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .agent-pill img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    object-fit: cover;
+  }
+  .agent-pill span {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .nonagon-cta {
+    text-align: center;
+  }
+
+  .privacy {
+    /* no background override — uses default */
   }
   .privacy-grid {
     display: grid;
@@ -320,7 +511,7 @@ import Layout from '../layouts/Layout.astro';
     font-size: 0.95rem;
   }
   .privacy-card {
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.5rem;
@@ -341,9 +532,51 @@ import Layout from '../layouts/Layout.astro';
     box-shadow: 0 0 30px rgba(232, 168, 73, 0.05);
   }
 
-  .interface-grid {
+  /* Voice Section */
+  .voice-section {
+    background: var(--surface);
+  }
+  .voice-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .voice-step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    flex: 1;
+    max-width: 220px;
+  }
+  .voice-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+  .voice-step h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .voice-step p { color: var(--text-muted); font-size: 0.8rem; line-height: 1.5; }
+  .voice-arrow { color: var(--accent); font-size: 1.5rem; font-weight: 600; }
+
+  /* Enterprise */
+  .enterprise-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .ent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .ent-card:hover { border-color: var(--accent); }
+  .ent-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .ent-card p { color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; }
+
+  .interface-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
   }
   .interface-card {
@@ -376,8 +609,13 @@ import Layout from '../layouts/Layout.astro';
   @media (max-width: 768px) {
     h1 { font-size: 2.2rem; }
     .feature-grid,
-    .interface-grid { grid-template-columns: 1fr; }
+    .enterprise-grid { grid-template-columns: 1fr; }
+    .interface-grid { grid-template-columns: 1fr 1fr; }
     .privacy-grid { grid-template-columns: 1fr; }
     .hero-actions { flex-direction: column; align-items: center; }
+    .hero-stats { gap: 0.5rem; }
+    .voice-flow { flex-direction: column; }
+    .voice-arrow { transform: rotate(90deg); }
+    .nonagon-grid { gap: 0.5rem; }
   }
 </style>

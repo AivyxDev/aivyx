@@ -133,9 +133,107 @@ Tools discovered:
           <h2>Federation</h2>
           <p>Agents on different instances can communicate and share memory. Send messages to federated peers, search memories across instances, and build truly distributed AI workflows.</p>
           <ul>
-            <li>Cross-instance agent messaging</li>
-            <li>Federated memory search</li>
-            <li>Capability-scoped federation</li>
+            <li>Cross-instance agent messaging with Ed25519 signature verification</li>
+            <li>Federated memory search across instances</li>
+            <li>Trust policies with allowed scopes and tier limits per peer</li>
+            <li>Multi-region failover with capability-aware peer selection</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Orchestration</div>
+          <h2>DAG Task Execution</h2>
+          <p>Move beyond sequential planning with a full <strong>directed acyclic graph</strong> execution engine. Steps run in parallel when independent, with results forwarded to dependents.</p>
+          <ul>
+            <li>Topological sort with wavefront parallel execution</li>
+            <li>Reflection loops — LLM-as-judge with automatic step re-insertion</li>
+            <li>Human-in-the-loop approval checkpoints with timeout escalation</li>
+            <li>Dynamic agent spawning mid-session with auto-cleanup</li>
+          </ul>
+          <pre><code>Step 1: Research ────┐
+Step 2: Analyze ──────┤→ Step 4: Synthesize → Step 5: Review
+Step 3: Code (needs 1)┘    (needs 1,2,3)       (approval)</code></pre>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Multimodal</div>
+          <h2>Voice & Vision</h2>
+          <p>Talk to your agent naturally with real-time <strong>WebSocket voice</strong>. Analyze images and documents with vision models. All modalities feed into encrypted multimodal memory.</p>
+          <ul>
+            <li>WebSocket voice: Listening → Processing → Speaking state machine</li>
+            <li>STT via Whisper or Ollama, TTS via OpenAI or edge-tts</li>
+            <li>Barge-in interruption with CancellationToken</li>
+            <li>Vision across Claude, OpenAI, and Ollama providers</li>
+            <li>PDF, XLSX, CSV document extraction pipeline</li>
+            <li>Multimodal memory with image attachment embeddings</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Interoperability</div>
+          <h2>A2A + MCP Protocols</h2>
+          <p>First-class support for both <strong>Google A2A</strong> (agent-to-agent) and <strong>MCP</strong> (agent-to-tool). Backed by 50+ companies, these are the emerging industry standards.</p>
+          <ul>
+            <li>A2A Agent Card, JSON-RPC task lifecycle, SSE streaming, push notifications</li>
+            <li>MCP with OAuth 2.1 + PKCE, sampling, elicitation, hot-reload</li>
+            <li>Server registry integration (Smithery.ai, mcp.run)</li>
+            <li>Federation for cross-instance agent collaboration</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Enterprise</div>
+          <h2>Multi-Tenancy & Governance</h2>
+          <p>Ship to production with confidence. Full <strong>multi-tenant isolation</strong>, enterprise authentication, and cost governance — all encrypted by default.</p>
+          <ul>
+            <li>Per-tenant HKDF key derivation with isolated directory trees</li>
+            <li>RBAC with 4 roles: Billing, Viewer, Operator, Admin</li>
+            <li>OIDC SSO with group-to-role mapping</li>
+            <li>Cost ledger with per-agent/tenant budgets and daily/monthly limits</li>
+            <li>Model routing by purpose (planning, execution, embedding)</li>
+            <li>Webhook triggers with HMAC-SHA256, multi-stage workflow engine</li>
+            <li>Kubernetes Helm chart with HPA, Ingress, PVC, secrets</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Intelligence</div>
+          <h2>Agents That Learn</h2>
+          <p>Aivyx agents <strong>improve over time</strong>. Outcome tracking, feedback loops, and knowledge graph evolution create a system that gets smarter with use.</p>
+          <ul>
+            <li>GraphRAG — knowledge graph with BFS, community detection, entity search</li>
+            <li>Agentic RAG — retrieval router with quality evaluation and multi-source synthesis</li>
+            <li>Memory consolidation — clustering, merge, decay pruning of stale memories</li>
+            <li>Outcome tracking with per-tool and per-role success rates</li>
+            <li>Planner feedback loops identifying successful tool combinations</li>
+            <li>Specialist recommendation learning with historical weight bonuses</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Production</div>
+          <h2>Hardened & Observable</h2>
+          <p>Battle-tested with <strong>1,576 tests</strong> across both repos. OWASP-aligned security, structured telemetry, and CI/CD-ready infrastructure.</p>
+          <ul>
+            <li>Prompt injection defense — 3-layer sanitization (ChatML, tool output, webhooks)</li>
+            <li>Tool abuse detection — sliding-window anomaly on frequency and scope escalation</li>
+            <li>Capability audit reports flagging overly permissive grants</li>
+            <li>OpenTelemetry + Prometheus + W3C Trace Context propagation</li>
+            <li>OpenAPI 3.1.0 spec covering all 90+ endpoints</li>
+            <li>Chaos testing (fault injection middleware) + k6 load tests</li>
+            <li>Horizontal scaling with session affinity strategies</li>
           </ul>
         </div>
       </div>

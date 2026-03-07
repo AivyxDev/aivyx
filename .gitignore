@@ -3,3 +3,4 @@
 # CI build secrets (temporary, cleaned up after build)
 .ci_ssh_key
 .ci_known_hosts
+node_modules
