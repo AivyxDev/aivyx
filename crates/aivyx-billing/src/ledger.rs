@@ -95,15 +95,11 @@ impl CostLedger {
             if let Some(date_str) = rest.split(':').next() {
                 // Pre-filter by date range using the key before decrypting
                 if let Ok(entry_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                    if let Some(from) = filter.from_date {
-                        if entry_date < from {
-                            continue;
-                        }
+                    if filter.from_date.is_some_and(|from| entry_date < from) {
+                        continue;
                     }
-                    if let Some(to) = filter.to_date {
-                        if entry_date > to {
-                            continue;
-                        }
+                    if filter.to_date.is_some_and(|to| entry_date > to) {
+                        continue;
                     }
                 }
             }
@@ -169,35 +165,23 @@ impl CostLedger {
 
 /// Check whether a ledger entry matches the given filter criteria.
 fn matches_filter(entry: &LedgerEntry, filter: &CostFilter) -> bool {
-    if let Some(ref tid) = filter.tenant_id {
-        if entry.tenant_id.as_ref() != Some(tid) {
-            return false;
-        }
+    if filter.tenant_id.as_ref().is_some_and(|tid| entry.tenant_id.as_ref() != Some(tid)) {
+        return false;
     }
-    if let Some(ref aid) = filter.agent_id {
-        if &entry.agent_id != aid {
-            return false;
-        }
+    if filter.agent_id.as_ref().is_some_and(|aid| &entry.agent_id != aid) {
+        return false;
     }
-    if let Some(ref team) = filter.team_name {
-        if entry.team_name.as_ref() != Some(team) {
-            return false;
-        }
+    if filter.team_name.as_ref().is_some_and(|team| entry.team_name.as_ref() != Some(team)) {
+        return false;
     }
-    if let Some(ref model) = filter.model {
-        if &entry.model != model {
-            return false;
-        }
+    if filter.model.as_ref().is_some_and(|model| &entry.model != model) {
+        return false;
     }
-    if let Some(from) = filter.from_date {
-        if entry.date < from {
-            return false;
-        }
+    if filter.from_date.is_some_and(|from| entry.date < from) {
+        return false;
     }
-    if let Some(to) = filter.to_date {
-        if entry.date > to {
-            return false;
-        }
+    if filter.to_date.is_some_and(|to| entry.date > to) {
+        return false;
     }
     true
 }
