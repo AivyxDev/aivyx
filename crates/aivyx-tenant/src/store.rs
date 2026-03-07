@@ -131,14 +131,17 @@ impl TenantStore {
         let all_keys = self.inner.list_keys()?;
         let mut tenants = Vec::new();
         for k in all_keys {
-            if let Some(_id_str) = k.strip_prefix(TENANT_PREFIX) {
-                if let Some(bytes) = self.inner.get(&k, key)? {
-                    if let Ok(record) = serde_json::from_slice::<TenantRecord>(&bytes) {
-                        if record.status != TenantStatus::Deleted {
-                            tenants.push(record);
-                        }
-                    }
-                }
+            if k.strip_prefix(TENANT_PREFIX).is_none() {
+                continue;
+            }
+            let Some(bytes) = self.inner.get(&k, key)? else {
+                continue;
+            };
+            let Ok(record) = serde_json::from_slice::<TenantRecord>(&bytes) else {
+                continue;
+            };
+            if record.status != TenantStatus::Deleted {
+                tenants.push(record);
             }
         }
         Ok(tenants)
