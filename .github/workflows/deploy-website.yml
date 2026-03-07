@@ -1,0 +1,63 @@
+# ── Website CI/CD ─────────────────────────────────────────────────────
+# Builds the Astro website and deploys to VPS2 on push to main.
+#
+# Secrets required:
+#   DEPLOY_SSH_KEY    — ed25519 private key authorized on VPS2 (user: aivyx)
+#   DEPLOY_HOST       — VPS2 IP (72.62.120.196)
+#   DEPLOY_USER       — SSH user (aivyx)
+#   DEPLOY_PORT       — SSH port (22)
+#
+name: Deploy Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/website/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/website/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/website
+        run: npm ci
+
+      - name: Build website
+        working-directory: apps/website
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.DEPLOY_PORT || '22' }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to VPS
+        run: |
+          rsync -avz --delete \
+            -e "ssh -p ${{ secrets.DEPLOY_PORT || '22' }} -o StrictHostKeyChecking=accept-new" \
+            apps/website/dist/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/web/dist/
+
+          ssh -p ${{ secrets.DEPLOY_PORT || '22' }} \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            'cd ~/web && docker compose restart website && sleep 5 && docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "website|NAMES"'
+
+          echo "✓ Website deployed to ${{ secrets.DEPLOY_HOST }}"
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
