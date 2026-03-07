@@ -104,12 +104,14 @@ impl CostLedger {
                 }
             }
 
-            if let Some(bytes) = self.store.get(&k, key)? {
-                if let Ok(entry) = serde_json::from_slice::<LedgerEntry>(&bytes) {
-                    if matches_filter(&entry, filter) {
-                        entries.push(entry);
-                    }
-                }
+            let Some(bytes) = self.store.get(&k, key)? else {
+                continue;
+            };
+            let Ok(entry) = serde_json::from_slice::<LedgerEntry>(&bytes) else {
+                continue;
+            };
+            if matches_filter(&entry, filter) {
+                entries.push(entry);
             }
         }
 
