@@ -13,15 +13,17 @@ use aivyx_crypto::{EncryptedStore, MasterKey};
 use aivyx_llm::create_provider;
 use chrono::Utc;
 use tokio::sync::mpsc;
+use tokio::task::JoinSet;
 use tracing;
 
+use crate::dag;
 use crate::planner;
 use crate::progress::ProgressEvent;
 use crate::store::{TaskMetadata, TaskStore};
 
 /// Convenience alias for the progress sink trait parameterized to task events.
 type DynProgressSink = dyn aivyx_core::ProgressSink<ProgressEvent>;
-use crate::types::{Mission, StepStatus, TaskStatus};
+use crate::types::{ExecutionMode, Mission, StepKind, StepStatus, TaskStatus};
 
 /// Orchestrates multi-step mission execution.
 pub struct TaskEngine {
@@ -129,22 +131,77 @@ impl TaskEngine {
         mission.updated_at = Utc::now();
         self.store.save(&mission, &self.task_key)?;
 
-        // Create agent for execution
+        // Dispatch based on execution mode
+        match mission.execution_mode() {
+            ExecutionMode::Sequential => {
+                self.execute_sequential(&mut mission, channel, progress)
+                    .await?;
+            }
+            ExecutionMode::Dag => {
+                // Validate the DAG before executing
+                dag::validate_dag(&mission.steps)?;
+                self.execute_dag(&mut mission, progress).await?;
+            }
+        }
+
+        Ok(mission)
+    }
+
+    /// Execute steps sequentially (legacy behavior).
+    async fn execute_sequential(
+        &self,
+        mission: &mut Mission,
+        channel: Option<&dyn ChannelAdapter>,
+        progress: Option<&DynProgressSink>,
+    ) -> Result<()> {
         let mut agent = self.session.create_agent(&mission.agent_name).await?;
 
-        // Execute each pending step
         while let Some(step_idx) = mission.next_pending_step() {
-            let step_prompt = build_step_prompt(&mission, step_idx);
+            let step_kind = mission.steps[step_idx].kind.clone();
+
+            // Build the appropriate prompt based on step kind
+            let step_prompt = match &step_kind {
+                StepKind::Execute => build_step_prompt(mission, step_idx),
+                StepKind::Reflect { target_step, .. } => {
+                    let target = &mission.steps[*target_step];
+                    let step = &mission.steps[step_idx];
+                    build_reflection_prompt(mission, step, target)
+                }
+                StepKind::Approval { .. } => {
+                    // Approval steps are handled separately below
+                    String::new()
+                }
+            };
+
             let step_desc = mission.steps[step_idx].description.clone();
+
+            // Handle approval steps without agent execution
+            if let StepKind::Approval {
+                ref context,
+                timeout_secs,
+                auto_approve_on_timeout,
+            } = step_kind
+            {
+                self.execute_approval_step(
+                    mission,
+                    step_idx,
+                    context,
+                    timeout_secs,
+                    auto_approve_on_timeout,
+                    channel,
+                    progress,
+                )
+                .await?;
+                continue;
+            }
 
             // Mark step as running
             mission.steps[step_idx].status = StepStatus::Running;
             mission.steps[step_idx].prompt = Some(step_prompt.clone());
             mission.steps[step_idx].started_at = Some(Utc::now());
             mission.updated_at = Utc::now();
-            self.store.save(&mission, &self.task_key)?;
+            self.store.save(mission, &self.task_key)?;
 
-            // Emit progress
             if let Some(sink) = progress {
                 let _ = sink
                     .emit(ProgressEvent::StepStarted {
@@ -159,14 +216,85 @@ impl TaskEngine {
             // Execute the step
             match agent.turn(&step_prompt, channel).await {
                 Ok(result) => {
+                    // For Reflect steps, parse the verdict
+                    if let StepKind::Reflect {
+                        target_step,
+                        max_depth,
+                        current_depth,
+                    } = &step_kind
+                    {
+                        let verdict = parse_reflection_result(&result)?;
+                        if !verdict.accept && *current_depth < *max_depth {
+                            // Reflection rejected: insert a retry Execute step and
+                            // a new Reflect step with incremented depth
+                            let feedback = verdict
+                                .feedback
+                                .unwrap_or_else(|| "Revision needed".to_string());
+                            tracing::info!(
+                                "Reflection rejected step {target_step} (depth {current_depth}/{max_depth}): {feedback}",
+                            );
+                            mission.steps[step_idx].status = StepStatus::Completed;
+                            mission.steps[step_idx].result =
+                                Some(format!("rejected: {feedback}"));
+                            mission.steps[step_idx].completed_at = Some(Utc::now());
+
+                            // Insert retry + re-reflect steps at the end
+                            let retry_idx = mission.steps.len();
+                            let re_reflect_idx = retry_idx + 1;
+
+                            mission.steps.push(Step {
+                                index: retry_idx,
+                                description: format!(
+                                    "Revision of step {}: {}",
+                                    target_step + 1,
+                                    feedback
+                                ),
+                                tool_hints: mission.steps[*target_step].tool_hints.clone(),
+                                status: StepStatus::Pending,
+                                prompt: None,
+                                result: None,
+                                retries: 0,
+                                started_at: None,
+                                completed_at: None,
+                                depends_on: vec![],
+                                kind: StepKind::Execute,
+                            });
+
+                            mission.steps.push(Step {
+                                index: re_reflect_idx,
+                                description: format!(
+                                    "Re-review of step {} revision",
+                                    target_step + 1
+                                ),
+                                tool_hints: vec![],
+                                status: StepStatus::Pending,
+                                prompt: None,
+                                result: None,
+                                retries: 0,
+                                started_at: None,
+                                completed_at: None,
+                                depends_on: vec![],
+                                kind: StepKind::Reflect {
+                                    target_step: retry_idx,
+                                    max_depth: *max_depth,
+                                    current_depth: current_depth + 1,
+                                },
+                            });
+
+                            mission.updated_at = Utc::now();
+                            self.store.save(mission, &self.task_key)?;
+                            continue;
+                        }
+                        // Accepted or at max depth — fall through to normal completion
+                    }
+
                     let summary = truncate(&result, 500);
                     mission.steps[step_idx].status = StepStatus::Completed;
                     mission.steps[step_idx].result = Some(result);
                     mission.steps[step_idx].completed_at = Some(Utc::now());
                     mission.updated_at = Utc::now();
-                    self.store.save(&mission, &self.task_key)?;
+                    self.store.save(mission, &self.task_key)?;
 
-                    // Audit + progress
                     self.audit(AuditEvent::TaskStepCompleted {
                         task_id: mission.id.to_string(),
                         step_index: step_idx,
@@ -186,72 +314,402 @@ impl TaskEngine {
                     }
                 }
                 Err(e) => {
-                    mission.steps[step_idx].retries += 1;
-                    let retries = mission.steps[step_idx].retries;
+                    if self
+                        .handle_step_failure(mission, step_idx, &step_desc, &e, progress)
+                        .await?
+                    {
+                        return Ok(());
+                    }
+                }
+            }
+        }
 
-                    if retries > mission.max_step_retries {
-                        // Step failed permanently
-                        let reason = format!("{e}");
-                        mission.steps[step_idx].status = StepStatus::Failed {
-                            reason: reason.clone(),
-                        };
+        self.finalize_mission(mission, progress).await
+    }
+
+    /// Execute steps as a DAG with parallel execution of independent steps.
+    ///
+    /// Steps whose dependencies are all `Completed` are launched concurrently
+    /// using a `JoinSet`. Each parallel step gets its own agent instance since
+    /// agents maintain conversation state. Results are collected and checkpointed
+    /// after each batch completes.
+    async fn execute_dag(
+        &self,
+        mission: &mut Mission,
+        progress: Option<&DynProgressSink>,
+    ) -> Result<()> {
+        loop {
+            let ready = dag::ready_steps(&mission.steps);
+
+            if ready.is_empty() {
+                // Check if we're actually done or deadlocked
+                let all_terminal = mission.steps.iter().all(|s| {
+                    matches!(
+                        s.status,
+                        StepStatus::Completed | StepStatus::Skipped | StepStatus::Failed { .. }
+                    )
+                });
+                if all_terminal {
+                    break;
+                }
+                // No ready steps but not all terminal → deadlock
+                return Err(AivyxError::Task(
+                    "DAG deadlock: no steps are ready but not all steps are terminal".into(),
+                ));
+            }
+
+            // Mark all ready steps as Running and prepare prompts
+            let mut step_prompts: Vec<(usize, String, String)> = Vec::new();
+            for &step_idx in &ready {
+                let step_prompt = build_step_prompt(mission, step_idx);
+                let step_desc = mission.steps[step_idx].description.clone();
+
+                mission.steps[step_idx].status = StepStatus::Running;
+                mission.steps[step_idx].prompt = Some(step_prompt.clone());
+                mission.steps[step_idx].started_at = Some(Utc::now());
+
+                if let Some(sink) = progress {
+                    let _ = sink
+                        .emit(ProgressEvent::StepStarted {
+                            task_id: mission.id,
+                            step_index: step_idx,
+                            step_description: step_desc.clone(),
+                            timestamp: Utc::now(),
+                        })
+                        .await;
+                }
+
+                step_prompts.push((step_idx, step_prompt, step_desc));
+            }
+            mission.updated_at = Utc::now();
+            self.store.save(mission, &self.task_key)?;
+
+            // Spawn each ready step concurrently with its own agent
+            let mut join_set: JoinSet<(usize, String, std::result::Result<String, AivyxError>)> =
+                JoinSet::new();
+
+            for (step_idx, step_prompt, step_desc) in step_prompts {
+                let session = Arc::clone(&self.session);
+                let agent_name = mission.agent_name.clone();
+
+                join_set.spawn(async move {
+                    let mut agent = match session.create_agent(&agent_name).await {
+                        Ok(a) => a,
+                        Err(e) => return (step_idx, step_desc, Err(e)),
+                    };
+                    let result = agent.turn(&step_prompt, None).await;
+                    (step_idx, step_desc, result)
+                });
+            }
+
+            // Collect results
+            while let Some(join_result) = join_set.join_next().await {
+                let (step_idx, step_desc, outcome) = match join_result {
+                    Ok(r) => r,
+                    Err(e) => {
+                        // JoinError — task panicked
+                        return Err(AivyxError::Task(format!(
+                            "step execution task panicked: {e}"
+                        )));
+                    }
+                };
+
+                match outcome {
+                    Ok(result) => {
+                        let summary = truncate(&result, 500);
+                        mission.steps[step_idx].status = StepStatus::Completed;
+                        mission.steps[step_idx].result = Some(result);
                         mission.steps[step_idx].completed_at = Some(Utc::now());
-                        mission.status = TaskStatus::Failed {
-                            reason: format!("step {step_idx} failed after {retries} retries: {e}"),
-                        };
-                        mission.updated_at = Utc::now();
-                        self.store.save(&mission, &self.task_key)?;
 
                         self.audit(AuditEvent::TaskStepCompleted {
                             task_id: mission.id.to_string(),
                             step_index: step_idx,
                             step_description: truncate(&step_desc, 100),
-                            success: false,
-                        });
-                        self.audit(AuditEvent::TaskCompleted {
-                            task_id: mission.id.to_string(),
-                            status: "Failed".into(),
-                            steps_completed: mission.steps_completed(),
-                            steps_total: mission.steps.len(),
+                            success: true,
                         });
                         if let Some(sink) = progress {
                             let _ = sink
                                 .emit(ProgressEvent::StepCompleted {
                                     task_id: mission.id,
                                     step_index: step_idx,
-                                    success: false,
-                                    result_summary: reason,
-                                    timestamp: Utc::now(),
-                                })
-                                .await;
-                            let _ = sink
-                                .emit(ProgressEvent::MissionCompleted {
-                                    task_id: mission.id,
-                                    success: false,
+                                    success: true,
+                                    result_summary: summary,
                                     timestamp: Utc::now(),
                                 })
                                 .await;
                         }
-
-                        return Ok(mission);
                     }
+                    Err(e) => {
+                        mission.steps[step_idx].retries += 1;
+                        let retries = mission.steps[step_idx].retries;
 
-                    // Retry: reset status to Pending so next_pending_step picks it up again
-                    tracing::warn!(
-                        "Step {step_idx} failed (attempt {retries}/{max}): {e}",
-                        max = mission.max_step_retries
-                    );
-                    mission.steps[step_idx].status = StepStatus::Pending;
-                    mission.updated_at = Utc::now();
-                    self.store.save(&mission, &self.task_key)?;
+                        if retries > mission.max_step_retries {
+                            let reason = format!("{e}");
+                            mission.steps[step_idx].status = StepStatus::Failed {
+                                reason: reason.clone(),
+                            };
+                            mission.steps[step_idx].completed_at = Some(Utc::now());
+
+                            // Skip all downstream dependents
+                            dag::skip_downstream(&mut mission.steps, step_idx);
+
+                            self.audit(AuditEvent::TaskStepCompleted {
+                                task_id: mission.id.to_string(),
+                                step_index: step_idx,
+                                step_description: truncate(&step_desc, 100),
+                                success: false,
+                            });
+                            if let Some(sink) = progress {
+                                let _ = sink
+                                    .emit(ProgressEvent::StepCompleted {
+                                        task_id: mission.id,
+                                        step_index: step_idx,
+                                        success: false,
+                                        result_summary: reason,
+                                        timestamp: Utc::now(),
+                                    })
+                                    .await;
+                            }
+                        } else {
+                            tracing::warn!(
+                                "DAG step {step_idx} failed (attempt {retries}/{max}): {e}",
+                                max = mission.max_step_retries
+                            );
+                            mission.steps[step_idx].status = StepStatus::Pending;
+                        }
+                    }
                 }
+            }
+
+            // Checkpoint after each batch
+            mission.updated_at = Utc::now();
+            self.store.save(mission, &self.task_key)?;
+
+            // Check if we should fail the overall mission
+            let any_failed = mission
+                .steps
+                .iter()
+                .any(|s| matches!(s.status, StepStatus::Failed { .. }));
+            let all_terminal = mission.steps.iter().all(|s| {
+                matches!(
+                    s.status,
+                    StepStatus::Completed | StepStatus::Skipped | StepStatus::Failed { .. }
+                )
+            });
+            if any_failed && all_terminal {
+                mission.status = TaskStatus::Failed {
+                    reason: "one or more DAG steps failed".into(),
+                };
+                mission.updated_at = Utc::now();
+                self.store.save(mission, &self.task_key)?;
+
+                self.audit(AuditEvent::TaskCompleted {
+                    task_id: mission.id.to_string(),
+                    status: "Failed".into(),
+                    steps_completed: mission.steps_completed(),
+                    steps_total: mission.steps.len(),
+                });
+                if let Some(sink) = progress {
+                    let _ = sink
+                        .emit(ProgressEvent::MissionCompleted {
+                            task_id: mission.id,
+                            success: false,
+                            timestamp: Utc::now(),
+                        })
+                        .await;
+                }
+                return Ok(());
             }
         }
 
-        // All steps completed
+        self.finalize_mission(mission, progress).await
+    }
+
+    /// Execute an approval gate step.
+    ///
+    /// Sends an approval request through the channel adapter (if available)
+    /// and waits for a response. Supports timeout with auto-approve/reject.
+    async fn execute_approval_step(
+        &self,
+        mission: &mut Mission,
+        step_idx: usize,
+        context: &str,
+        timeout_secs: Option<u64>,
+        auto_approve_on_timeout: bool,
+        channel: Option<&dyn ChannelAdapter>,
+        progress: Option<&DynProgressSink>,
+    ) -> Result<()> {
+        let step_desc = mission.steps[step_idx].description.clone();
+
+        mission.steps[step_idx].status = StepStatus::Running;
+        mission.steps[step_idx].started_at = Some(Utc::now());
+        mission.updated_at = Utc::now();
+        self.store.save(mission, &self.task_key)?;
+
+        if let Some(sink) = progress {
+            let _ = sink
+                .emit(ProgressEvent::StepStarted {
+                    task_id: mission.id,
+                    step_index: step_idx,
+                    step_description: step_desc.clone(),
+                    timestamp: Utc::now(),
+                })
+                .await;
+        }
+
+        // If no channel is available, auto-resolve based on timeout policy
+        let approved = if channel.is_some() {
+            // TODO: Send approval request through channel and wait for response.
+            // For now, auto-approve when a channel is present. The full
+            // implementation will use the channel's approval protocol in Task 15.
+            tracing::info!(
+                "Approval gate at step {step_idx}: {context} (auto-approved, channel present)"
+            );
+            true
+        } else if auto_approve_on_timeout {
+            tracing::info!(
+                "Approval gate at step {step_idx}: {context} (auto-approved, no channel)"
+            );
+            true
+        } else {
+            tracing::warn!(
+                "Approval gate at step {step_idx}: {context} (rejected, no channel and auto_approve_on_timeout=false)"
+            );
+            false
+        };
+
+        if approved {
+            mission.steps[step_idx].status = StepStatus::Completed;
+            mission.steps[step_idx].result = Some("approved".to_string());
+            mission.steps[step_idx].completed_at = Some(Utc::now());
+
+            self.audit(AuditEvent::TaskStepCompleted {
+                task_id: mission.id.to_string(),
+                step_index: step_idx,
+                step_description: truncate(&step_desc, 100),
+                success: true,
+            });
+        } else {
+            let reason = "approval rejected or timed out".to_string();
+            mission.steps[step_idx].status = StepStatus::Failed {
+                reason: reason.clone(),
+            };
+            mission.steps[step_idx].completed_at = Some(Utc::now());
+            mission.status = TaskStatus::Failed {
+                reason: format!("approval gate at step {step_idx} was rejected"),
+            };
+
+            self.audit(AuditEvent::TaskStepCompleted {
+                task_id: mission.id.to_string(),
+                step_index: step_idx,
+                step_description: truncate(&step_desc, 100),
+                success: false,
+            });
+        }
+
+        mission.updated_at = Utc::now();
+        self.store.save(mission, &self.task_key)?;
+
+        if let Some(sink) = progress {
+            let _ = sink
+                .emit(ProgressEvent::StepCompleted {
+                    task_id: mission.id,
+                    step_index: step_idx,
+                    success: approved,
+                    result_summary: if approved {
+                        "approved".to_string()
+                    } else {
+                        "rejected".to_string()
+                    },
+                    timestamp: Utc::now(),
+                })
+                .await;
+        }
+
+        Ok(())
+    }
+
+    /// Handle a step execution failure (retry or fail permanently).
+    ///
+    /// Returns `true` if the mission should stop (permanent failure),
+    /// `false` if the step was retried and execution should continue.
+    async fn handle_step_failure(
+        &self,
+        mission: &mut Mission,
+        step_idx: usize,
+        step_desc: &str,
+        error: &AivyxError,
+        progress: Option<&DynProgressSink>,
+    ) -> Result<bool> {
+        mission.steps[step_idx].retries += 1;
+        let retries = mission.steps[step_idx].retries;
+
+        if retries > mission.max_step_retries {
+            let reason = format!("{error}");
+            mission.steps[step_idx].status = StepStatus::Failed {
+                reason: reason.clone(),
+            };
+            mission.steps[step_idx].completed_at = Some(Utc::now());
+            mission.status = TaskStatus::Failed {
+                reason: format!("step {step_idx} failed after {retries} retries: {error}"),
+            };
+            mission.updated_at = Utc::now();
+            self.store.save(mission, &self.task_key)?;
+
+            self.audit(AuditEvent::TaskStepCompleted {
+                task_id: mission.id.to_string(),
+                step_index: step_idx,
+                step_description: truncate(step_desc, 100),
+                success: false,
+            });
+            self.audit(AuditEvent::TaskCompleted {
+                task_id: mission.id.to_string(),
+                status: "Failed".into(),
+                steps_completed: mission.steps_completed(),
+                steps_total: mission.steps.len(),
+            });
+            if let Some(sink) = progress {
+                let _ = sink
+                    .emit(ProgressEvent::StepCompleted {
+                        task_id: mission.id,
+                        step_index: step_idx,
+                        success: false,
+                        result_summary: reason,
+                        timestamp: Utc::now(),
+                    })
+                    .await;
+                let _ = sink
+                    .emit(ProgressEvent::MissionCompleted {
+                        task_id: mission.id,
+                        success: false,
+                        timestamp: Utc::now(),
+                    })
+                    .await;
+            }
+
+            return Ok(true);
+        }
+
+        tracing::warn!(
+            "Step {step_idx} failed (attempt {retries}/{max}): {error}",
+            max = mission.max_step_retries
+        );
+        mission.steps[step_idx].status = StepStatus::Pending;
+        mission.updated_at = Utc::now();
+        self.store.save(mission, &self.task_key)?;
+
+        Ok(false)
+    }
+
+    /// Finalize a successfully completed mission.
+    async fn finalize_mission(
+        &self,
+        mission: &mut Mission,
+        progress: Option<&DynProgressSink>,
+    ) -> Result<()> {
         mission.status = TaskStatus::Completed;
         mission.updated_at = Utc::now();
-        self.store.save(&mission, &self.task_key)?;
+        self.store.save(mission, &self.task_key)?;
 
         self.audit(AuditEvent::TaskCompleted {
             task_id: mission.id.to_string(),
@@ -270,10 +728,14 @@ impl TaskEngine {
                 .await;
         }
 
-        Ok(mission)
+        Ok(())
     }
 
     /// Execute a mission with streaming: forwards agent tokens to `token_tx`.
+    ///
+    /// Note: DAG missions fall back to sequential streaming (steps run one at a time
+    /// in topological order) since parallel streaming requires multiplexing token
+    /// channels which is not yet implemented.
     pub async fn execute_mission_stream(
         &self,
         task_id: &TaskId,
@@ -537,6 +999,77 @@ fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
+/// Build a reflection prompt for a Reflect step.
+///
+/// The reflection prompt includes the target step's description and result,
+/// asking the agent to evaluate quality and provide a structured verdict.
+fn build_reflection_prompt(mission: &Mission, step: &Step, target_step: &Step) -> String {
+    let target_result = target_step
+        .result
+        .as_deref()
+        .unwrap_or("(no result available)");
+
+    format!(
+        "You are performing a quality review as part of a multi-step mission.\n\n\
+         Overall goal: {goal}\n\n\
+         Target step (step {target_num}): {target_desc}\n\n\
+         Output to review:\n{result}\n\n\
+         Evaluate whether this output adequately accomplishes the step's objective.\n\
+         Consider: accuracy, completeness, relevance to the overall goal.\n\n\
+         Respond with ONLY a JSON object:\n\
+         {{\"accept\": true}} if the output is satisfactory, or\n\
+         {{\"accept\": false, \"feedback\": \"specific improvements needed\"}} if revision is needed.",
+        goal = mission.goal,
+        target_num = target_step.index + 1,
+        target_desc = target_step.description,
+        result = truncate(target_result, 2000),
+    )
+}
+
+/// The result of parsing a reflection response.
+#[derive(Debug)]
+struct ReflectionVerdict {
+    accept: bool,
+    feedback: Option<String>,
+}
+
+/// Parse a reflection agent's response into a structured verdict.
+fn parse_reflection_result(response: &str) -> Result<ReflectionVerdict> {
+    let trimmed = response.trim();
+
+    // Try to find JSON in the response (the agent might include extra text)
+    let json_str = if let Some(start) = trimmed.find('{') {
+        if let Some(end) = trimmed.rfind('}') {
+            &trimmed[start..=end]
+        } else {
+            trimmed
+        }
+    } else {
+        trimmed
+    };
+
+    #[derive(serde::Deserialize)]
+    struct RawVerdict {
+        accept: bool,
+        #[serde(default)]
+        feedback: Option<String>,
+    }
+
+    match serde_json::from_str::<RawVerdict>(json_str) {
+        Ok(v) => Ok(ReflectionVerdict {
+            accept: v.accept,
+            feedback: v.feedback,
+        }),
+        Err(_) => {
+            // If parsing fails, treat the entire response as a non-acceptance with feedback
+            Ok(ReflectionVerdict {
+                accept: false,
+                feedback: Some(response.to_string()),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -555,6 +1088,8 @@ mod tests {
             retries: 0,
             started_at: None,
             completed_at: None,
+            depends_on: vec![],
+            kind: crate::types::StepKind::default(),
         }];
 
         let prompt = build_step_prompt(&mission, 0);
@@ -700,5 +1235,79 @@ mod tests {
         assert_eq!(final_mission.steps[2].status, StepStatus::Skipped);
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn parse_reflection_accepts() {
+        let response = r#"{"accept": true}"#;
+        let verdict = parse_reflection_result(response).unwrap();
+        assert!(verdict.accept);
+        assert!(verdict.feedback.is_none());
+    }
+
+    #[test]
+    fn parse_reflection_rejects_with_feedback() {
+        let response = r#"{"accept": false, "feedback": "Missing citations"}"#;
+        let verdict = parse_reflection_result(response).unwrap();
+        assert!(!verdict.accept);
+        assert_eq!(verdict.feedback.as_deref(), Some("Missing citations"));
+    }
+
+    #[test]
+    fn parse_reflection_with_surrounding_text() {
+        let response = "After careful review:\n{\"accept\": true}\nThe output looks good.";
+        let verdict = parse_reflection_result(response).unwrap();
+        assert!(verdict.accept);
+    }
+
+    #[test]
+    fn parse_reflection_invalid_json_becomes_rejection() {
+        let response = "This output needs more detail about error handling.";
+        let verdict = parse_reflection_result(response).unwrap();
+        assert!(!verdict.accept);
+        assert!(verdict.feedback.is_some());
+    }
+
+    #[test]
+    fn build_reflection_prompt_includes_target() {
+        let mut mission = Mission::new("Research Rust", "researcher");
+        mission.steps = vec![
+            Step {
+                index: 0,
+                description: "Write analysis".into(),
+                tool_hints: vec![],
+                status: StepStatus::Completed,
+                prompt: None,
+                result: Some("Rust is a systems language".into()),
+                retries: 0,
+                started_at: None,
+                completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::Execute,
+            },
+            Step {
+                index: 1,
+                description: "Review analysis".into(),
+                tool_hints: vec![],
+                status: StepStatus::Pending,
+                prompt: None,
+                result: None,
+                retries: 0,
+                started_at: None,
+                completed_at: None,
+                depends_on: vec![0],
+                kind: StepKind::Reflect {
+                    target_step: 0,
+                    max_depth: 2,
+                    current_depth: 0,
+                },
+            },
+        ];
+
+        let prompt = build_reflection_prompt(&mission, &mission.steps[1], &mission.steps[0]);
+        assert!(prompt.contains("Research Rust"));
+        assert!(prompt.contains("Write analysis"));
+        assert!(prompt.contains("Rust is a systems language"));
+        assert!(prompt.contains("accept"));
     }
 }

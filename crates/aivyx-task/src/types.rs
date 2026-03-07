@@ -37,6 +37,47 @@ impl TaskStatus {
     }
 }
 
+/// What kind of step this is — determines execution behavior.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum StepKind {
+    /// Normal execution step (default, backwards-compatible).
+    Execute,
+    /// Reflection: re-evaluate a previous step's output.
+    Reflect {
+        /// Index of the step whose output to reflect on.
+        target_step: usize,
+        /// Maximum number of revision iterations.
+        max_depth: u32,
+        /// How many iterations have occurred so far.
+        current_depth: u32,
+    },
+    /// Human approval gate: pause and wait for user confirmation.
+    Approval {
+        /// Description of what needs approval.
+        context: String,
+        /// Optional timeout in seconds before auto-resolution.
+        timeout_secs: Option<u64>,
+        /// If true, auto-approve on timeout; if false, auto-reject.
+        auto_approve_on_timeout: bool,
+    },
+}
+
+impl Default for StepKind {
+    fn default() -> Self {
+        StepKind::Execute
+    }
+}
+
+/// Whether a mission uses sequential or DAG-based execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionMode {
+    /// Steps are executed one after another (legacy behavior).
+    Sequential,
+    /// Steps form a dependency graph and may run in parallel.
+    Dag,
+}
+
 /// The state of a single step within a mission.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state")]
@@ -74,6 +115,12 @@ pub struct Step {
     pub started_at: Option<DateTime<Utc>>,
     /// When this step completed.
     pub completed_at: Option<DateTime<Utc>>,
+    /// Indices of steps that must complete before this one can start.
+    #[serde(default)]
+    pub depends_on: Vec<usize>,
+    /// What kind of step this is (execute, reflect, approval).
+    #[serde(default)]
+    pub kind: StepKind,
 }
 
 /// Default maximum retries per step.
@@ -135,6 +182,18 @@ impl Mission {
         })
     }
 
+    /// Determine whether this mission uses sequential or DAG execution.
+    ///
+    /// Returns [`ExecutionMode::Dag`] if any step has a non-empty `depends_on`,
+    /// otherwise [`ExecutionMode::Sequential`] (preserving legacy behavior).
+    pub fn execution_mode(&self) -> ExecutionMode {
+        if self.steps.iter().any(|s| !s.depends_on.is_empty()) {
+            ExecutionMode::Dag
+        } else {
+            ExecutionMode::Sequential
+        }
+    }
+
     /// Collect summaries of completed steps for context injection.
     pub fn completed_step_summaries(&self) -> Vec<(usize, &str, &str)> {
         self.steps
@@ -185,6 +244,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -196,6 +257,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
         assert_eq!(m.next_pending_step(), Some(1));
@@ -281,6 +344,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -292,6 +357,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
         assert!(m.next_pending_step().is_none());
@@ -311,6 +378,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -322,6 +391,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 2,
@@ -333,6 +404,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 3,
@@ -344,6 +417,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
         assert_eq!(m.next_pending_step(), Some(2));
@@ -363,6 +438,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -374,6 +451,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 2,
@@ -385,6 +464,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
         let summaries = m.completed_step_summaries();

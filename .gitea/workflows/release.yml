@@ -25,12 +25,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup SSH for git deps
+        run: |
+          ssh-keyscan -p 2222 aivyx-gitea.cloud >> /home/aivyx/.ssh/known_hosts 2>/dev/null || true
+          eval "$(ssh-agent -s)"
+          ssh-add /home/aivyx/.ssh/id_ed25519 2>/dev/null || true
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+
       - name: Build portable binaries (Docker)
         run: |
           VERSION="${{ github.ref_name }}"
           echo "Building ${VERSION}..."
-          docker build \
+          DOCKER_BUILDKIT=1 docker build \
             --no-cache \
+            --ssh default=/home/aivyx/.ssh/id_ed25519 \
             -t aivyx-builder:${VERSION} \
             -f deploy/desktop/Dockerfile.build \
             .

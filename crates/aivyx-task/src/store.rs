@@ -122,6 +122,8 @@ mod tests {
             retries: 0,
             started_at: None,
             completed_at: None,
+            depends_on: vec![],
+            kind: crate::types::StepKind::default(),
         }];
         m
     }

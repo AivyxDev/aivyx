@@ -27,3 +27,9 @@ default = ["memory"]
 memory = ["dep:aivyx-memory"]
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { workspace = true, features = ["test-util"] }
+
+[[bench]]
+name = "message_bus"
+harness = false

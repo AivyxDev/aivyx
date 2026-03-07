@@ -15,6 +15,8 @@ license = "Proprietary"
 
 [workspace.dependencies]
 # ─── aivyx-core crates (from git) ────────────────────────────────
+# NOTE: SSH URLs required — Gitea has REQUIRE_SIGNIN_VIEW=true,
+# blocking anonymous HTTPS. CI containers must mount the SSH socket.
 aivyx-core = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
 aivyx-crypto = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
 aivyx-config = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }

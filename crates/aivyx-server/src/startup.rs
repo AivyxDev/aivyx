@@ -249,6 +249,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             axum::routing::get(routes::metrics::metrics_timeline),
         )
         .route(
+            "/metrics/costs",
+            axum::routing::get(routes::metrics::cost_rollup),
+        )
+        .route(
             "/admin/rotate-token",
             axum::routing::post(routes::admin::rotate_token),
         )

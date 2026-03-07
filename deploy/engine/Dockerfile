@@ -1,5 +1,11 @@
+# syntax=docker/dockerfile:1
 # ─── Stage 1: Build the aivyx binary ────────────────────────────────
 FROM rust:bookworm AS builder
+
+RUN apt-get update && apt-get install -y openssh-client && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /root/.ssh && \
+    ssh-keyscan -p 2222 aivyx-gitea.cloud >> /root/.ssh/known_hosts 2>/dev/null
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
 WORKDIR /build
 
@@ -7,8 +13,8 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates/ crates/
 
-# Build only the CLI binary (includes the server subcommand)
-RUN cargo build --release --package aivyx-cli \
+# Build only the CLI binary (uses BuildKit SSH mount for git deps)
+RUN --mount=type=ssh cargo build --release --package aivyx-engine-cli \
     && strip target/release/aivyx
 
 # ─── Stage 2: Minimal runtime ──────────────────────────────────────

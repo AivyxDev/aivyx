@@ -27,14 +27,21 @@ jobs:
 
       - name: Build, test, lint
         run: |
+          # Start SSH agent and add the runner's key for git deps
+          eval "$(ssh-agent -s)"
+          ssh-add /home/aivyx/.ssh/id_ed25519 2>/dev/null || true
+          ssh-keyscan -p 2222 aivyx-gitea.cloud >> /home/aivyx/.ssh/known_hosts 2>/dev/null || true
+
           docker run --rm \
             -v "$PWD":/build \
+            -v /home/aivyx/.ssh:/root/.ssh:ro \
+            -e CARGO_NET_GIT_FETCH_WITH_CLI=true \
             -w /build \
             rust:1.93-bookworm \
             bash -c '
               set -euo pipefail
               apt-get update -qq && apt-get install -y -qq \
-                pkg-config libssl-dev libsqlite3-dev > /dev/null 2>&1
+                pkg-config libssl-dev libsqlite3-dev openssh-client > /dev/null 2>&1
 
               echo "=== Build ==="
               cargo build --workspace
@@ -49,6 +56,10 @@ jobs:
               echo "=== Format ==="
               rustup component add rustfmt 2>/dev/null
               cargo fmt --all -- --check
+
+              echo "=== Audit ==="
+              cargo install cargo-audit --quiet 2>/dev/null || true
+              cargo audit || echo "⚠ cargo audit found issues (non-blocking)"
 
               echo "✓ All checks passed"
             '

@@ -29,6 +29,7 @@
 //! # }
 //! ```
 
+pub mod dag;
 pub mod engine;
 pub mod planner;
 pub mod progress;
@@ -38,4 +39,4 @@ pub mod types;
 pub use engine::TaskEngine;
 pub use progress::{ChannelProgressSink, ProgressEvent};
 pub use store::{TaskMetadata, TaskStore};
-pub use types::{Mission, Step, StepStatus, TaskStatus};
+pub use types::{ExecutionMode, Mission, Step, StepKind, StepStatus, TaskStatus};
