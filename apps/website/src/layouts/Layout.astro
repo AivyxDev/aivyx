@@ -1,0 +1,342 @@
+---
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Privacy-first AI agent with encrypted memory. Own your intelligence.' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="beta-banner">
+      <div class="beta-banner-inner">
+        <span class="beta-badge">BETA</span>
+        <span>The Aivyx ecosystem is currently in <strong>beta</strong>. Features may change and bugs are expected.</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-inner">
+        <a href="/" class="logo">🕯️ <span>AIVYX</span></a>
+        <div class="nav-links">
+          <a href="/features">Features</a>
+          <a href="/compare">Compare</a>
+          <a href="/blog">Blog</a>
+          <a href="/docs">Docs</a>
+          <a href="/download">Download</a>
+          <a href="https://github.com/AivyxDev/aivyx" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="logo">🕯️ AIVYX</span>
+          <p>Own Your Intelligence</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/features">Features</a>
+            <a href="/compare">Compare</a>
+            <a href="/blog">Blog</a>
+            <a href="/download">Download</a>
+            <a href="/docs">Documentation</a>
+          </div>
+          <div class="footer-col">
+            <h4>Community</h4>
+            <a href="https://github.com/AivyxDev/aivyx" target="_blank">GitHub</a>
+            <a href="https://github.com/AivyxDev/aivyx/discussions" target="_blank">Discussions</a>
+            <a href="https://discord.gg/aivyx" target="_blank">Discord</a>
+          </div>
+          <div class="footer-col">
+            <h4>Legal</h4>
+            <a href="/privacy">Privacy</a>
+            <a href="/disclaimer">Disclaimer</a>
+            <a href="https://github.com/AivyxDev/aivyx/blob/main/LICENSE" target="_blank">MIT License</a>
+          </div>
+        </div>
+        <div class="footer-newsletter">
+          <h4>Stay Updated</h4>
+          <p>Get Aivyx news, articles, and release announcements. No spam, ever.</p>
+          <form class="newsletter-form" action="#" method="POST">
+            <input type="email" placeholder="your@email.com" required aria-label="Email address" />
+            <button type="submit">Subscribe</button>
+          </form>
+        </div>
+        <div class="footer-bottom">
+          <p>&copy; 2026 Aivyx. Open source, privacy-first.</p>
+          <p class="footer-disclaimer">Aivyx is beta software provided "as is" without warranty. Use at your own risk. See <a href="/disclaimer">full disclaimer</a>.</p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg: #1a1a1a;
+    --surface: #242424;
+    --border: #3a3a3a;
+    --text: #e8e0d4;
+    --text-muted: #a89b8c;
+    --accent: #e8a849;
+    --accent-hover: #f0b85a;
+    --success: #7fb069;
+    --error: #d4726a;
+    --warning: #d4a84b;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  main {
+    flex: 1;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  a:hover {
+    color: var(--accent-hover);
+  }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+</style>
+
+<style>
+  .beta-banner {
+    background: linear-gradient(90deg, #2a2010, #3a2a10, #2a2010);
+    border-bottom: 1px solid var(--accent);
+    padding: 0.5rem 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    z-index: 101;
+  }
+  .beta-banner-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .beta-badge {
+    background: var(--accent);
+    color: #1a1a1a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.1em;
+  }
+  .beta-banner strong {
+    color: var(--accent);
+  }
+
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(26, 26, 26, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.875rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .logo span {
+    letter-spacing: 0.08em;
+  }
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover {
+    color: var(--text);
+  }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    margin-top: 6rem;
+  }
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 3rem 2rem 2rem;
+  }
+  .footer-brand {
+    margin-bottom: 2rem;
+  }
+  .footer-brand p {
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  .footer-col h4 {
+    color: var(--text);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+  .footer-col a {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  .footer-bottom {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+  }
+  .footer-bottom p {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .footer-newsletter {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+  .footer-newsletter h4 {
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+  }
+  .footer-newsletter p {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
+  .newsletter-form {
+    display: flex;
+    gap: 0.5rem;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  .newsletter-form input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+  .newsletter-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .newsletter-form button {
+    padding: 0.5rem 1.25rem;
+    background: var(--accent);
+    color: #1a1a1a;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .newsletter-form button:hover {
+    opacity: 0.9;
+  }
+  .footer-disclaimer {
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    opacity: 0.7;
+  }
+  .footer-disclaimer a {
+    color: var(--text-muted);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .nav-links { gap: 1rem; }
+    .footer-links { grid-template-columns: 1fr; }
+  }
+</style>

@@ -1,0 +1,398 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const team = [
+  {
+    name: "Coordinator",
+    code: "coordinator",
+    image: "/images/team/mission-director.png",
+    role: "Lead",
+    tier: "Trust",
+    persona: "Authoritative and decisive",
+    soul: "Central orchestrator who decomposes complex goals, delegates to specialists, and synthesizes results into coherent deliverables.",
+    tools: ["file_read", "directory_list", "json_parse", "notification_send", "schedule_task", "translate"],
+    skills: ["task decomposition", "delegation", "synthesis", "conflict resolution", "progress tracking"],
+  },
+  {
+    name: "Researcher",
+    code: "researcher",
+    image: "/images/team/intelligence-analyst.png",
+    role: "Researcher",
+    tier: "Trust",
+    persona: "Meticulous and evidence-based",
+    soul: "Gathers information from web, files, and codebases. Evaluates source reliability, notes confidence levels, and produces structured reports with citations.",
+    tools: ["web_search", "http_fetch", "file_read", "file_write", "grep_search", "translate", "csv_query", "sentiment_analyze"],
+    skills: ["summarization", "fact checking", "source evaluation", "literature review", "data gathering"],
+  },
+  {
+    name: "Analyst",
+    code: "analyst",
+    image: "/images/team/data-analyst.png",
+    role: "Analyst",
+    tier: "Trust",
+    persona: "Analytical and structured",
+    soul: "Ingests structured and unstructured data, identifies patterns and anomalies, and produces clear reports with quantified findings and confidence intervals.",
+    tools: ["grep_search", "json_parse", "hash_compute", "csv_query", "sql_query", "math_eval", "chart_generate", "log_analyze"],
+    skills: ["data analysis", "pattern recognition", "reporting", "statistical reasoning", "visualization"],
+  },
+  {
+    name: "Coder",
+    code: "coder",
+    image: "/images/team/lead-developer.png",
+    role: "Coder",
+    tier: "Leash",
+    persona: "Precise and solution-oriented",
+    soul: "Writes clean, well-tested code following project conventions. Runs tests and linters, uses git for version control, and reports changes with verification results.",
+    tools: ["file_read", "file_write", "shell", "git_status", "git_diff", "git_log", "git_commit", "text_diff", "file_patch"],
+    skills: ["coding", "debugging", "testing", "refactoring", "performance optimization", "API design"],
+  },
+  {
+    name: "Reviewer",
+    code: "reviewer",
+    image: "/images/team/quality-auditor.png",
+    role: "Reviewer",
+    tier: "Trust",
+    persona: "Critical and constructive",
+    soul: "Reviews code for correctness, security vulnerabilities, style consistency, and maintainability. Produces structured feedback: critical issues first, then suggestions.",
+    tools: ["file_read", "shell", "grep_search", "text_diff", "git_diff", "git_log", "pii_detect", "compliance_check"],
+    skills: ["code review", "security audit", "vulnerability assessment", "best practices", "dependency audit"],
+  },
+  {
+    name: "Writer",
+    code: "writer",
+    image: "/images/team/creative-writer.png",
+    role: "Writer",
+    tier: "Trust",
+    persona: "Clear and audience-aware",
+    soul: "Produces clear documentation, changelogs, tutorials, and reports. Adapts tone to audience — terse for changelogs, thorough for API docs, approachable for tutorials.",
+    tools: ["file_read", "file_write", "project_tree", "template_render", "markdown_export", "chart_generate", "translate"],
+    skills: ["technical writing", "documentation", "API docs", "tutorial writing", "changelog authoring"],
+  },
+  {
+    name: "Planner",
+    code: "planner",
+    image: "/images/team/master-architect.png",
+    role: "Planner",
+    tier: "Trust",
+    persona: "Systematic and risk-aware",
+    soul: "Decomposes goals into actionable steps with dependencies and acceptance criteria. Assesses complexity, identifies risks, and produces structured plans with milestones.",
+    tools: ["file_read", "file_write", "project_tree", "json_parse", "diagram_author", "risk_matrix", "schedule_task"],
+    skills: ["planning", "task decomposition", "risk assessment", "dependency analysis", "effort estimation"],
+  },
+  {
+    name: "Guardian",
+    code: "guardian",
+    image: "/images/team/ethics-warden.png",
+    role: "Guardian",
+    tier: "Trust",
+    persona: "Vigilant and security-focused",
+    soul: "Monitors for security issues, validates capability usage, reviews audit logs for anomalies, and flags vulnerabilities. Methodical and conservative — raises concerns early.",
+    tools: ["file_read", "grep_search", "hash_compute", "env_read", "git_log", "git_diff", "pii_detect", "compliance_check", "log_analyze"],
+    skills: ["security monitoring", "audit review", "threat modeling", "compliance checking", "incident analysis"],
+  },
+  {
+    name: "Executor",
+    code: "executor",
+    image: "/images/team/generalist.png",
+    role: "Executor",
+    tier: "Leash",
+    persona: "Terse and action-oriented",
+    soul: "Carries out system-level operations — shell commands, file management, git workflows, and environment configuration. Broadest tool access, operates deliberately.",
+    tools: ["shell", "file_read", "file_write", "file_delete", "file_move", "file_copy", "git_status", "git_commit", "archive_manage"],
+    skills: ["command execution", "file operations", "deployment", "build automation", "system administration"],
+  },
+];
+---
+
+<Layout title="The Nonagon — Aivyx" description="Meet the 9-agent Nonagon team: Coordinator, Researcher, Analyst, Coder, Reviewer, Writer, Planner, Guardian, and Executor.">
+  <section class="page-hero">
+    <div class="hero-badge">9 Specialist Agents · Capability-Scoped · Autonomous</div>
+    <h1>The <span class="accent">Nonagon</span></h1>
+    <p>Nine specialist agents, each with its own identity, tools, and skills. The Coordinator decomposes your mission and delegates to the right specialists — every agent operates within its capability boundary.</p>
+  </section>
+
+  <section class="team-section">
+    <div class="section-inner">
+      <div class="team-grid">
+        {team.map((member) => (
+          <div class="team-card" data-tier={member.tier}>
+            <div class="card-header">
+              <img src={member.image} alt={member.name} class="avatar" loading="lazy" />
+              <div class="card-meta">
+                <h3>{member.name}</h3>
+                <div class="role-badge">{member.role}</div>
+                <div class={`tier-badge ${member.tier.toLowerCase()}`}>{member.tier}</div>
+                <div class="persona-tone">{member.persona}</div>
+              </div>
+            </div>
+            <p class="soul">{member.soul}</p>
+            <div class="card-details">
+              <div class="detail-section">
+                <h4>Tools</h4>
+                <div class="tags">
+                  {member.tools.map((t) => <span class="tag tool">{t}</span>)}
+                </div>
+              </div>
+              <div class="detail-section">
+                <h4>Skills</h4>
+                <div class="tags">
+                  {member.skills.map((s) => <span class="tag skill">{s}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="architecture">
+    <div class="section-inner">
+      <h2>How It Works</h2>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-icon">🎯</div>
+          <h3>Mission In</h3>
+          <p>You describe a complex goal. The Coordinator analyzes it and creates a structured plan.</p>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-card">
+          <div class="arch-icon">🔀</div>
+          <h3>Decompose & Delegate</h3>
+          <p>Tasks are broken into subtasks and assigned to the best-fit specialist by role.</p>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-card">
+          <div class="arch-icon">⚙️</div>
+          <h3>Execute & Verify</h3>
+          <p>Specialists work within their capability boundaries. A Reviewer validates quality.</p>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-card">
+          <div class="arch-icon">📦</div>
+          <h3>Synthesize</h3>
+          <p>The Coordinator weaves results into a coherent deliverable and reports back.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="capabilities">
+    <div class="section-inner">
+      <h2>Capability Attenuation</h2>
+      <p class="section-sub">Every agent operates within strict boundaries — no agent can exceed its granted capabilities.</p>
+      <div class="cap-grid">
+        <div class="cap-card">
+          <h3>🔒 Trust Tier</h3>
+          <p>Researcher, Analyst, Writer, Planner, Guardian, Reviewer, and Coordinator operate autonomously within their scopes.</p>
+        </div>
+        <div class="cap-card">
+          <h3>🔐 Leash Tier</h3>
+          <p>Coder and Executor require approval for destructive operations — shell commands and file deletions.</p>
+        </div>
+        <div class="cap-card">
+          <h3>🛡️ Scoped Access</h3>
+          <p>Each role gets the minimum capability set for its tools: Filesystem, Shell, Network, or Custom scopes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .page-hero {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.02em;
+  }
+  .page-hero h1 {
+    font-size: 2.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .accent { color: var(--accent); }
+  .page-hero p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .section-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+  }
+  h2 {
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--text-muted);
+    margin-bottom: 3rem;
+  }
+
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .team-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .team-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .team-card:first-child {
+    grid-column: span 3;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 0 2rem;
+    border-color: rgba(232, 168, 73, 0.3);
+    box-shadow: 0 0 30px rgba(232, 168, 73, 0.05);
+  }
+  .team-card:first-child .card-header { grid-column: 1; grid-row: 1 / 3; align-self: center; flex-direction: column; text-align: center; }
+  .team-card:first-child .soul { grid-column: 2; grid-row: 1; }
+  .team-card:first-child .card-details { grid-column: 2; grid-row: 2; }
+  .team-card:first-child .avatar { width: 120px; height: 120px; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    object-fit: cover;
+  }
+  .card-meta h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+  .role-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    background: rgba(232, 168, 73, 0.1);
+    color: var(--accent);
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .tier-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .tier-badge.trust { background: rgba(74, 222, 128, 0.1); color: var(--success); }
+  .tier-badge.leash { background: rgba(232, 168, 73, 0.1); color: var(--accent); }
+
+  .persona-tone {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.35rem;
+  }
+
+  .soul {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .detail-section { margin-bottom: 0.75rem; }
+  .detail-section h4 {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .tag {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tag.tool { background: rgba(96, 165, 250, 0.1); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.2); }
+  .tag.skill { background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2); }
+
+  .arch-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  .arch-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    flex: 1;
+    max-width: 220px;
+  }
+  .arch-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+  .arch-card h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .arch-card p { color: var(--text-muted); font-size: 0.8rem; line-height: 1.5; }
+  .arch-arrow { color: var(--accent); font-size: 1.5rem; font-weight: 600; }
+
+  .architecture { background: var(--surface); }
+
+  .cap-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .cap-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .cap-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .cap-card p { color: var(--text-muted); font-size: 0.875rem; line-height: 1.5; }
+
+  @media (max-width: 900px) {
+    .team-grid { grid-template-columns: 1fr; }
+    .team-card:first-child { grid-column: span 1; grid-template-columns: 1fr; }
+    .team-card:first-child .card-header { grid-row: 1; }
+    .team-card:first-child .soul { grid-column: 1; }
+    .team-card:first-child .card-details { grid-column: 1; }
+    .arch-grid { flex-direction: column; }
+    .arch-arrow { transform: rotate(90deg); }
+    .cap-grid { grid-template-columns: 1fr; }
+  }
+</style>

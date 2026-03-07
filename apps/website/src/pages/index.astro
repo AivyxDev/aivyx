@@ -1,0 +1,383 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Aivyx — Own Your Intelligence">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <div class="hero-badge">Open Source · Privacy-First · Written in Rust</div>
+      <h1>Own Your <span class="accent">Intelligence</span></h1>
+      <p class="hero-sub">
+        A privacy-first AI agent that runs on <em>your</em> machine, encrypts your data, 
+        and remembers your context. No cloud required.
+      </p>
+      <div class="hero-actions">
+        <a href="/download" class="btn btn-primary">Download</a>
+        <a href="/docs" class="btn btn-secondary">Get Started →</a>
+      </div>
+      <pre class="hero-terminal"><code><span class="prompt">$</span> aivyx run assistant
+<span class="dim">🕯️ Connecting to Ollama (llama3.2)...</span>
+<span class="dim">🔒 Session encrypted. Audit logging enabled.</span>
+
+<span class="you">You:</span> Analyze the security model of my Rust project
+<span class="agent">Aivyx:</span> I'll review your project structure and dependencies...
+<span class="dim">   ✦ Using skill: security-audit</span>
+<span class="dim">   ✦ Scanning 42 files across 6 crates</span>
+<span class="dim">   ✦ Checking for unsafe blocks, dependency vulnerabilities...</span></code></pre>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="section-inner">
+      <h2>Built Different</h2>
+      <p class="section-sub">Everything you'd expect from an AI assistant, with everything you demand from a privacy tool.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>Encrypted at Rest</h3>
+          <p>ChaCha20Poly1305 authenticated encryption with HKDF-SHA256 derived keys. Your data is unreadable without your passphrase.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>Persistent Memory</h3>
+          <p>Semantic knowledge graph that learns and remembers. Your agent builds understanding over time — encrypted, always.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏠</div>
+          <h3>Local-First</h3>
+          <p>Runs on your machine with Ollama for fully local inference. Or connect to OpenAI, Anthropic, or Gemini when you need more power.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Tamper-Proof Audit</h3>
+          <p>HMAC chain on every action. If anyone modifies a single log entry, the chain breaks. Verify anytime with <code>aivyx audit verify</code>.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔧</div>
+          <h3>46 Built-in Tools</h3>
+          <p>Filesystem, git, web, shell, JSON, CSV, diagrams, compliance, PII detection — plus MCP for infinite extensibility.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>22 Built-in Skills</h3>
+          <p>Code review, deep research, security audit, financial analysis, and more. Structured workflows that produce professional results.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤝</div>
+          <h3>Nonagon Team</h3>
+          <p>9 specialist agents — Coordinator, Researcher, Coder, Reviewer, and more — collaborate on complex missions with capability-scoped autonomy.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy Section -->
+  <section class="privacy">
+    <div class="section-inner">
+      <div class="privacy-grid">
+        <div class="privacy-text">
+          <h2>Your AI. Your Data. <span class="accent">Your Rules.</span></h2>
+          <p>
+            Most AI tools require you to hand your data to a cloud provider. 
+            Aivyx takes a different approach: everything stays on your machine, 
+            encrypted with keys derived from your passphrase.
+          </p>
+          <ul class="privacy-list">
+            <li>✦ No telemetry. No analytics. No phone-home.</li>
+            <li>✦ Passphrase never stored — only derived keys in memory</li>
+            <li>✦ Key material zeroed on process exit</li>
+            <li>✦ Open source — verify every line yourself</li>
+          </ul>
+        </div>
+        <div class="privacy-visual">
+          <div class="privacy-card cloud">
+            <h4>☁️ Cloud AI</h4>
+            <div class="privacy-item bad">✗ Your prompts on their servers</div>
+            <div class="privacy-item bad">✗ No encryption at rest</div>
+            <div class="privacy-item bad">✗ No audit trail</div>
+            <div class="privacy-item bad">✗ Terms of service own your data</div>
+          </div>
+          <div class="privacy-card local">
+            <h4>🕯️ Aivyx</h4>
+            <div class="privacy-item good">✓ Runs 100% locally</div>
+            <div class="privacy-item good">✓ ChaCha20Poly1305 encryption</div>
+            <div class="privacy-item good">✓ HMAC tamper-proof audit</div>
+            <div class="privacy-item good">✓ You own everything</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interfaces -->
+  <section class="interfaces">
+    <div class="section-inner">
+      <h2>Your Way</h2>
+      <p class="section-sub">Terminal, GUI, or API — Aivyx meets you where you work.</p>
+      <div class="interface-grid">
+        <div class="interface-card">
+          <h3>CLI</h3>
+          <pre><code>$ aivyx run assistant "Explain ownership in Rust"</code></pre>
+          <p>Single commands, streaming chat, pipe-friendly output.</p>
+        </div>
+        <div class="interface-card">
+          <h3>TUI</h3>
+          <pre><code>$ aivyx tui assistant</code></pre>
+          <p>Full terminal UI with sessions, markdown, and vim-style keys.</p>
+        </div>
+        <div class="interface-card">
+          <h3>Desktop</h3>
+          <pre><code>Tauri v2 native app</code></pre>
+          <p>Visual setup wizard, chat interface, and agent management.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="section-inner">
+      <h2>Ready to own your intelligence?</h2>
+      <p>Open source. MIT licensed. Free forever.</p>
+      <div class="hero-actions">
+        <a href="/download" class="btn btn-primary">Download Aivyx</a>
+        <a href="https://github.com/AivyxDev/aivyx" class="btn btn-secondary" target="_blank">View on GitHub →</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 6rem 2rem 4rem;
+    overflow: hidden;
+  }
+  .hero-glow {
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(232, 168, 73, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-content {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.02em;
+  }
+  h1 {
+    font-size: 3.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-bottom: 1.25rem;
+  }
+  .accent {
+    color: var(--accent);
+  }
+  .hero-sub {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 600px;
+    margin: 0 auto 2rem;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 3rem;
+  }
+  .btn {
+    display: inline-block;
+    padding: 0.75rem 1.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #1a1a1a;
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    color: #1a1a1a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(232, 168, 73, 0.3);
+  }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .hero-terminal {
+    text-align: left;
+    max-width: 650px;
+    margin: 0 auto;
+    font-size: 0.8rem;
+    line-height: 1.7;
+  }
+  .prompt { color: var(--accent); }
+  .dim { color: var(--text-muted); }
+  .you { color: var(--success); font-weight: 600; }
+  .agent { color: var(--accent); font-weight: 600; }
+
+  .section-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+  h2 {
+    font-size: 2.2rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 3rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .feature-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .feature-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .feature-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+  .feature-card p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .privacy {
+    background: var(--surface);
+  }
+  .privacy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+  }
+  .privacy-text h2 {
+    text-align: left;
+    font-size: 2rem;
+  }
+  .privacy-text p {
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin: 1rem 0 1.5rem;
+  }
+  .privacy-list {
+    list-style: none;
+  }
+  .privacy-list li {
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+  .privacy-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .privacy-card h4 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .privacy-item {
+    padding: 0.4rem 0;
+    font-size: 0.875rem;
+  }
+  .privacy-item.bad { color: var(--error); }
+  .privacy-item.good { color: var(--success); }
+  .privacy-card.local {
+    border-color: rgba(232, 168, 73, 0.3);
+    box-shadow: 0 0 30px rgba(232, 168, 73, 0.05);
+  }
+
+  .interface-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .interface-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem;
+  }
+  .interface-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  .interface-card pre {
+    margin-bottom: 1rem;
+  }
+  .interface-card p {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .cta {
+    text-align: center;
+  }
+  .cta p {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 768px) {
+    h1 { font-size: 2.2rem; }
+    .feature-grid,
+    .interface-grid { grid-template-columns: 1fr; }
+    .privacy-grid { grid-template-columns: 1fr; }
+    .hero-actions { flex-direction: column; align-items: center; }
+  }
+</style>

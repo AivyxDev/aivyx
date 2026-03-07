@@ -1,0 +1,427 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Download — Aivyx" description="Download and install Aivyx — privacy-first AI agent for Linux, macOS, and Windows.">
+  <section class="page-hero">
+    <h1>Get <span class="accent">Aivyx</span></h1>
+    <p>Up and running in under 5 minutes. Free, open source, MIT licensed.</p>
+  </section>
+
+  <section class="steps-section">
+    <div class="section-inner">
+      <h2>Step-by-Step Installation</h2>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Install Rust</h3>
+          <p>Aivyx is written in Rust. If you don't have Rust installed yet, run this one-liner in your terminal:</p>
+          <pre><code>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></pre>
+          <p class="hint">Follow the prompts — the defaults are fine. When it finishes, <strong>close and reopen your terminal</strong> so the <code>cargo</code> command becomes available.</p>
+          <p class="hint">Already have Rust? Make sure you're on 1.85 or newer: <code>rustup update</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Install Aivyx</h3>
+          <p>This downloads the source code from GitHub and compiles it on your machine (takes about 1–2 minutes):</p>
+          <pre><code>cargo install --git https://github.com/AivyxDev/aivyx.git aivyx-cli</code></pre>
+          <p class="hint">The binary is installed to <code>~/.cargo/bin/aivyx</code>.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Make Sure It's in Your PATH</h3>
+          <p>If typing <code>aivyx</code> gives "command not found", add cargo's bin folder to your PATH:</p>
+          <div class="tab-group">
+            <div class="tab-card">
+              <h4>Bash</h4>
+              <pre><code>echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc</code></pre>
+            </div>
+            <div class="tab-card">
+              <h4>Zsh</h4>
+              <pre><code>echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc</code></pre>
+            </div>
+            <div class="tab-card">
+              <h4>Fish</h4>
+              <pre><code>fish_add_path ~/.cargo/bin</code></pre>
+            </div>
+          </div>
+          <p class="hint">Not sure which shell you use? Run <code>echo $SHELL</code> to find out.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Initialize &amp; Set Up</h3>
+          <p>Run the one-time setup wizard. This creates your encrypted data directory and walks you through configuring your LLM provider:</p>
+          <pre><code>aivyx init</code></pre>
+          <p class="hint">You'll be asked for:</p>
+          <ul>
+            <li>🔑 <strong>API key</strong> — for OpenAI, Anthropic, Gemini, or a local Ollama server</li>
+            <li>🔒 <strong>Passphrase</strong> — encrypts all your data (never stored, only derived keys are kept)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Start Using Aivyx</h3>
+          <p>You're ready! Pick your favourite way to interact:</p>
+          <pre><code><span class="dim"># Quick single question</span>
+aivyx run assistant "Explain ownership in Rust"
+
+<span class="dim"># Interactive chat session</span>
+aivyx chat assistant
+
+<span class="dim"># Full terminal UI with sessions, markdown, vim keys</span>
+aivyx tui assistant</code></pre>
+        </div>
+      </div>
+
+      <div class="verify-box">
+        <h3>✓ Verify Everything Works</h3>
+        <pre><code>$ aivyx --help
+Secure, privacy-first AI agent framework
+
+Commands:
+  init       Initialize ~/.aivyx/
+  run        Run a single-turn agent task
+  chat       Interactive multi-turn chat
+  tui        Launch the terminal UI
+  ...</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="desktop-section">
+    <div class="section-inner">
+      <h2>🖥️ Desktop App</h2>
+      <p class="section-sub">A native graphical interface built with Tauri v2. Just download, install, and run — no terminal required.</p>
+
+      <div class="download-grid">
+        <div class="dl-card primary">
+          <div class="dl-icon">🐧</div>
+          <h3>Linux (AppImage)</h3>
+          <p>Works on any Linux distro. No installation needed — just download, make executable, and run.</p>
+          <a href="/releases/latest/aivyx-desktop.AppImage" class="btn btn-download">Download .AppImage</a>
+          <pre><code><span class="dim"># Make it executable and run</span>
+chmod +x aivyx-desktop.AppImage
+./aivyx-desktop.AppImage</code></pre>
+        </div>
+        <div class="dl-card">
+          <div class="dl-icon">📦</div>
+          <h3>Linux (.deb)</h3>
+          <p>For Ubuntu, Debian, Pop!_OS, and other apt-based distros.</p>
+          <a href="/releases/latest/aivyx-desktop.deb" class="btn btn-download">Download .deb</a>
+          <pre><code><span class="dim"># Install with dpkg</span>
+sudo dpkg -i aivyx-desktop.deb</code></pre>
+        </div>
+        <div class="dl-card">
+          <div class="dl-icon">💻</div>
+          <h3>Linux (CLI Binary)</h3>
+          <p>Pre-built CLI binary — no Rust compiler needed.</p>
+          <a href="/releases/latest/aivyx-linux-x86_64.tar.gz" class="btn btn-download">Download CLI Tarball</a>
+          <pre><code><span class="dim"># Extract and install</span>
+tar xzf aivyx-linux-x86_64.tar.gz
+sudo mv aivyx /usr/local/bin/
+aivyx init</code></pre>
+        </div>
+      </div>
+
+      <div class="coming-soon">
+        <h4>macOS &amp; Windows</h4>
+        <p>Native .dmg (macOS) and .msi (Windows) packages are in development. For now, you can <a href="#cli">install from source using Cargo</a> on any platform.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt-section">
+    <div class="section-inner">
+      <h2>Alternative: Build from Source</h2>
+      <p class="section-sub">For contributors who want the full repo.</p>
+      <pre><code>git clone https://github.com/AivyxDev/aivyx.git
+cd aivyx
+cargo build --release
+./target/release/aivyx init</code></pre>
+    </div>
+  </section>
+
+  <section class="local-llm">
+    <div class="section-inner">
+      <h2>Want Fully Local AI?</h2>
+      <p class="section-sub">Use <a href="https://ollama.com" target="_blank">Ollama</a> for 100% offline inference — no API keys, no cloud, no data leaving your machine.</p>
+      <pre><code><span class="dim"># Install Ollama (one command)</span>
+curl -fsSL https://ollama.com/install.sh | sh
+
+<span class="dim"># Pull a model</span>
+ollama pull llama3.2
+
+<span class="dim"># Then tell Aivyx to use it</span>
+aivyx config set provider ollama
+aivyx config set ollama.model llama3.2</code></pre>
+    </div>
+  </section>
+
+  <section class="requirements">
+    <div class="section-inner">
+      <h2>System Requirements</h2>
+      <div class="req-grid">
+        <div class="req-card">
+          <h3>🐧 Linux</h3>
+          <ul>
+            <li>x86_64 or aarch64</li>
+            <li>glibc 2.31+</li>
+            <li>OpenSSL 3.x</li>
+          </ul>
+        </div>
+        <div class="req-card">
+          <h3>🍎 macOS</h3>
+          <ul>
+            <li>macOS 12+ (Monterey)</li>
+            <li>Apple Silicon or Intel</li>
+          </ul>
+        </div>
+        <div class="req-card">
+          <h3>🪟 Windows</h3>
+          <ul>
+            <li>Windows 10+</li>
+            <li>x86_64</li>
+            <li>Visual C++ Build Tools</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .page-hero {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+  }
+  .page-hero h1 {
+    font-size: 2.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .accent { color: var(--accent); }
+  .page-hero p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+  .section-inner {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+
+  .step {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+    align-items: flex-start;
+  }
+  .step-num {
+    min-width: 40px;
+    height: 40px;
+    background: var(--accent);
+    color: #1a1a1a;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+  }
+  .step-content { flex: 1; }
+  .step-content h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+  }
+  .step-content p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+  }
+  .step-content ul {
+    list-style: none;
+    padding: 0;
+  }
+  .step-content li {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 0.3rem 0;
+  }
+  .hint {
+    font-size: 0.85rem !important;
+    color: var(--text-muted) !important;
+    opacity: 0.8;
+  }
+
+  .tab-group {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+  }
+  .tab-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+  .tab-card h4 {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .tab-card pre {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    margin: 0;
+  }
+
+  .verify-box {
+    background: var(--surface);
+    border: 1px solid rgba(127, 176, 105, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+  .verify-box h3 {
+    color: var(--success);
+    margin-bottom: 1rem;
+  }
+
+  .alt-section {
+    background: var(--surface);
+  }
+
+  .dim { color: var(--text-muted); }
+
+  .req-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .req-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .req-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  .req-card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .req-card li {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    padding: 0.25rem 0;
+  }
+  @media (max-width: 768px) {
+    .step { flex-direction: column; gap: 0.75rem; }
+    .tab-group { grid-template-columns: 1fr; }
+    .req-grid { grid-template-columns: 1fr; }
+    .download-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Desktop Download Section */
+  .desktop-section {
+    background: var(--surface);
+  }
+  .download-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+  .dl-card {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .dl-card.primary {
+    border-color: rgba(217, 175, 107, 0.4);
+  }
+  .dl-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .dl-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .dl-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+  }
+  .dl-card pre {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .btn-download {
+    display: inline-block;
+    background: var(--accent);
+    color: #1a1a1a;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .btn-download:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  .coming-soon {
+    background: var(--background);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .coming-soon h4 {
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+  }
+  .coming-soon p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+</style>

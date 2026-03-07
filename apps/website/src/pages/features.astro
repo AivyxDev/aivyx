@@ -1,0 +1,280 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Features — Aivyx" description="Privacy-first AI agent with encrypted memory, multi-provider LLM, 46 built-in tools, 22 skills, Nonagon team, and MCP connectivity.">
+  <section class="page-hero">
+    <h1>Features</h1>
+    <p>Everything you need from an AI agent. Nothing you don't want from a privacy tool.</p>
+  </section>
+
+  <section class="feature-section">
+    <div class="section-inner">
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Security</div>
+          <h2>Encrypted at Rest</h2>
+          <p>Every piece of data Aivyx stores is encrypted with <strong>ChaCha20Poly1305</strong> authenticated encryption. Keys are derived using <strong>HKDF-SHA256</strong> with a unique salt per purpose — compromising one key doesn't expose data encrypted with another.</p>
+          <ul>
+            <li>Master passphrase → Argon2id → HKDF per-purpose keys</li>
+            <li>Separate keys for memory, audit, sessions, secrets</li>
+            <li>Key material zeroed on process exit via <code>secrecy</code> crate</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Intelligence</div>
+          <h2>Persistent Memory</h2>
+          <p>Aivyx builds a semantic knowledge graph from your conversations. It extracts facts as subject-predicate-object triples and stores them encrypted. Your agent genuinely learns and remembers over time.</p>
+          <ul>
+            <li>Automatic fact extraction from conversations</li>
+            <li>Semantic triple store with encrypted storage</li>
+            <li>User profile learning (preferences, timezone, tools)</li>
+            <li>Full control: <code>aivyx memory list</code>, search, delete</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Flexibility</div>
+          <h2>Multi-Provider LLM</h2>
+          <p>Use any LLM provider — from fully local to cloud. Switch between them per-task. Configure different providers for different purposes.</p>
+          <div class="provider-grid">
+            <div class="provider">🦙 Ollama <span>Local</span></div>
+            <div class="provider">🟢 OpenAI <span>Cloud</span></div>
+            <div class="provider">🟣 Anthropic <span>Cloud</span></div>
+            <div class="provider">🔵 Google Gemini <span>Cloud</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Accountability</div>
+          <h2>Tamper-Proof Audit</h2>
+          <p>Every action your agent takes is recorded in an HMAC chain. Each entry signs the previous hash, creating a tamper-evident log. If anyone modifies a single entry, the chain breaks.</p>
+          <pre><code>$ aivyx audit verify
+✓ Chain integrity verified
+✓ 1,247 entries validated
+✓ No tampering detected</code></pre>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Extensibility</div>
+          <h2>22 Built-in Skills</h2>
+          <p>Structured workflows that produce professional-quality results. From code review to financial analysis, each skill follows a proven methodology.</p>
+          <div class="skill-tags">
+            <span>code-review</span><span>deep-research</span><span>security-audit</span>
+            <span>data-analysis-workflow</span><span>technical-writing</span><span>debugging-systematic</span>
+            <span>project-planning</span><span>risk-assessment</span><span>competitive-analysis</span>
+            <span>report-writing</span><span>task-decomposition</span><span>test-strategy</span>
+            <span>financial-analysis</span><span>content-strategy</span><span>compliance-frameworks</span>
+            <span>incident-response</span><span>delegation-strategy</span><span>multi-source-synthesis</span>
+            <span>peer-review-protocol</span><span>source-evaluation</span><span>structured-output</span>
+            <span>aivyx-conventions</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Integration</div>
+          <h2>46 Built-in Tools + MCP</h2>
+          <p>A comprehensive toolkit spanning 4 phases of development. Plus the <strong>Model Context Protocol</strong> for infinite extensibility.</p>
+          <div class="tool-categories">
+            <div class="tool-cat">
+              <h4>Core (22 tools)</h4>
+              <p>File read/write/delete/move/copy, shell, web search, HTTP fetch, grep, glob, directory list, project tree/outline, text diff, git (status/diff/log/commit), JSON parse, hash, datetime, env</p>
+            </div>
+            <div class="tool-cat">
+              <h4>Analysis (Phase 11A)</h4>
+              <p>CSV query, math eval, config parse, regex replace, text statistics, sentiment analysis, entity extraction, PII detection, risk matrix, image metadata</p>
+            </div>
+            <div class="tool-cat">
+              <h4>Documents (Phase 11B)</h4>
+              <p>Document extraction, chart generation, diagram authoring, template rendering, markdown export, HTML-to-markdown</p>
+            </div>
+            <div class="tool-cat">
+              <h4>Infrastructure (Phase 11D)</h4>
+              <p>Log analysis, compliance checking, file patching, archive management</p>
+            </div>
+          </div>
+          <pre><code>$ aivyx mcp list --command "npx -y @mcp/server-github"
+Tools discovered:
+  • create_issue (owner, repo, title, body)
+  • search_repositories (query)
+  • get_file_contents (owner, repo, path)
+  • create_pull_request (owner, repo, title, head, base)</code></pre>
+        </div>
+      </div>
+
+      <div class="feature-detail">
+        <div class="feature-text">
+          <div class="feature-tag">Collaboration</div>
+          <h2>The Nonagon Team</h2>
+          <p>Nine specialist agents collaborate on complex missions. Each has its own persona, tools, skills, and capability boundaries. The Coordinator decomposes goals, delegates to the right specialist, and synthesizes results.</p>
+          <div class="nonagon-roles">
+            <span class="nr">🎯 Coordinator</span><span class="nr">🔬 Researcher</span><span class="nr">📊 Analyst</span>
+            <span class="nr">💻 Coder</span><span class="nr">🔍 Reviewer</span><span class="nr">✍️ Writer</span>
+            <span class="nr">📋 Planner</span><span class="nr">🛡️ Guardian</span><span class="nr">⚙️ Executor</span>
+          </div>
+          <p style="margin-top: 1rem;"><a href="/team">Meet the team →</a></p>
+        </div>
+      </div>
+
+      <div class="feature-detail reverse">
+        <div class="feature-text">
+          <div class="feature-tag">Distributed</div>
+          <h2>Federation</h2>
+          <p>Agents on different instances can communicate and share memory. Send messages to federated peers, search memories across instances, and build truly distributed AI workflows.</p>
+          <ul>
+            <li>Cross-instance agent messaging</li>
+            <li>Federated memory search</li>
+            <li>Capability-scoped federation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .page-hero {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+  }
+  .page-hero h1 {
+    font-size: 2.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .page-hero p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .section-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+  }
+  .feature-detail {
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .feature-tag {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: rgba(232, 168, 73, 0.1);
+    color: var(--accent);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+  .feature-detail h2 {
+    text-align: left;
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+  }
+  .feature-detail p {
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+  .feature-detail ul {
+    list-style: none;
+    padding: 0;
+  }
+  .feature-detail li {
+    color: var(--text-muted);
+    padding: 0.3rem 0;
+    padding-left: 1.25rem;
+    position: relative;
+  }
+  .feature-detail li::before {
+    content: '✦';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+  .provider-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .provider {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  .provider span {
+    float: right;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .skill-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .skill-tags span {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tool-categories {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.25rem 0;
+  }
+  .tool-cat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .tool-cat h4 {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .tool-cat p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+  }
+  .nonagon-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .nr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+  @media (max-width: 768px) {
+    .tool-categories { grid-template-columns: 1fr; }
+  }
+</style>

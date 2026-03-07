@@ -1,0 +1,358 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Documentation — Aivyx" description="Guides, tutorials, and references for the Aivyx AI agent.">
+  <section class="page-hero">
+    <h1>Documentation</h1>
+    <p>Everything you need to get started and go deep.</p>
+  </section>
+
+  <section class="quickstart">
+    <div class="section-inner">
+      <h2>Quick Start</h2>
+      <p class="section-sub">From zero to chatting with your own AI agent.</p>
+
+      <div class="qs-steps">
+        <div class="qs-step">
+          <div class="qs-icon">📦</div>
+          <div>
+            <h4>Install</h4>
+            <pre><code>cargo install --git https://github.com/AivyxDev/aivyx.git aivyx-cli</code></pre>
+            <p>Need Rust? See the <a href="/download">Download page</a> for complete step-by-step instructions.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-icon">🔑</div>
+          <div>
+            <h4>Set Up</h4>
+            <pre><code>aivyx init</code></pre>
+            <p>Creates your encrypted data directory, configures your LLM provider, and sets your passphrase.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-icon">💬</div>
+          <div>
+            <h4>Chat</h4>
+            <pre><code>aivyx chat assistant</code></pre>
+            <p>Start an interactive conversation. Or use <code>aivyx tui assistant</code> for the full terminal UI.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="commands-section">
+    <div class="section-inner">
+      <h2>Everyday Commands</h2>
+      <p class="section-sub">The commands you'll use most often.</p>
+
+      <div class="cmd-grid">
+        <div class="cmd-card">
+          <h4>Run a Task</h4>
+          <pre><code>aivyx run assistant "Explain closures in Rust"</code></pre>
+          <p>Single-turn — ask a question, get an answer.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Interactive Chat</h4>
+          <pre><code>aivyx chat assistant</code></pre>
+          <p>Multi-turn conversation with memory.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Terminal UI</h4>
+          <pre><code>aivyx tui assistant</code></pre>
+          <p>Full-screen chat with sessions, markdown, and vim keys.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Use a Skill</h4>
+          <pre><code>aivyx run assistant --skill code-review</code></pre>
+          <p>22 built-in skills for research, audits, analysis, and more.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Store an API Key</h4>
+          <pre><code>aivyx secret set OPENAI_API_KEY</code></pre>
+          <p>Encrypted secret store — enter the value interactively.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Add an MCP Tool</h4>
+          <pre><code>aivyx mcp add github \
+  --command "npx -y @mcp/server-github"</code></pre>
+          <p>Connect external tools via MCP.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Search Memories</h4>
+          <pre><code>aivyx memory search "Rust ownership"</code></pre>
+          <p>Find knowledge your agent has learned.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Verify Audit Log</h4>
+          <pre><code>aivyx audit verify</code></pre>
+          <p>Confirm no one has tampered with your logs.</p>
+        </div>
+        <div class="cmd-card">
+          <h4>Backup Everything</h4>
+          <pre><code>aivyx backup</code></pre>
+          <p>Create an encrypted archive of all your data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="providers-section">
+    <div class="section-inner">
+      <h2>Supported LLM Providers</h2>
+      <p class="section-sub">Choose the provider that fits your needs.</p>
+
+      <div class="provider-grid">
+        <div class="provider-card local">
+          <h3>🏠 Ollama (Local)</h3>
+          <p>100% offline. Your data never leaves your machine.</p>
+          <pre><code>aivyx config set provider ollama
+aivyx config set ollama.model llama3.2</code></pre>
+        </div>
+        <div class="provider-card">
+          <h3>OpenAI</h3>
+          <pre><code>aivyx config set provider openai
+aivyx secret set OPENAI_API_KEY</code></pre>
+        </div>
+        <div class="provider-card">
+          <h3>Anthropic</h3>
+          <pre><code>aivyx config set provider anthropic
+aivyx secret set ANTHROPIC_API_KEY</code></pre>
+        </div>
+        <div class="provider-card">
+          <h3>Google Gemini</h3>
+          <pre><code>aivyx config set provider gemini
+aivyx secret set GEMINI_API_KEY</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="docs-section">
+    <div class="section-inner">
+      <h2>In-Depth Guides</h2>
+      <p class="section-sub">Deep dives for power users and contributors.</p>
+
+      <div class="docs-grid">
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/guides/getting-started.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🚀</div>
+          <h3>Getting Started</h3>
+          <p>Complete install guide with all configuration options.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/guides/user-manual.md" class="doc-card" target="_blank">
+          <div class="doc-icon">📖</div>
+          <h3>User Manual</h3>
+          <p>Every CLI command documented with examples.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/architecture.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🏗️</div>
+          <h3>Architecture</h3>
+          <p>Three-repo design, crate graph, and data flow.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/security.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🔐</div>
+          <h3>Security Model</h3>
+          <p>Key derivation, encryption, audit chain, threat model.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/guides/skills-guide.md" class="doc-card" target="_blank">
+          <div class="doc-icon">⚡</div>
+          <h3>Skills Guide</h3>
+          <p>22 built-in skills and creating your own.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/guides/mcp-guide.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🔌</div>
+          <h3>MCP Guide</h3>
+          <p>Connecting external tools via Model Context Protocol.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/guides/desktop-app.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🖥️</div>
+          <h3>Desktop App</h3>
+          <p>Building the Tauri v2 desktop application.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx/blob/main/docs/brand/brand-guide.md" class="doc-card" target="_blank">
+          <div class="doc-icon">🎨</div>
+          <h3>Brand Guide</h3>
+          <p>The Candlelit Kitchen design language.</p>
+        </a>
+
+        <a href="https://github.com/AivyxDev/aivyx-core" class="doc-card" target="_blank">
+          <div class="doc-icon">📦</div>
+          <h3>Core Crates</h3>
+          <p>Shared foundation — 10 Rust crates.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .page-hero {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+  }
+  .page-hero h1 {
+    font-size: 2.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .page-hero p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+  .section-inner {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+
+  /* Quick Start */
+  .quickstart {
+    background: var(--surface);
+  }
+  .qs-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .qs-step {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+  .qs-icon {
+    font-size: 1.5rem;
+    min-width: 2.5rem;
+    text-align: center;
+    margin-top: 0.25rem;
+  }
+  .qs-step h4 {
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+  }
+  .qs-step p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+  }
+  .qs-step pre {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Command Grid */
+  .cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  .cmd-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  .cmd-card h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    color: var(--accent);
+  }
+  .cmd-card pre {
+    font-size: 0.72rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .cmd-card p {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  /* Providers */
+  .providers-section { background: var(--surface); }
+  .provider-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  .provider-card {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  .provider-card.local {
+    grid-column: 1 / -1;
+    border-color: rgba(127, 176, 105, 0.4);
+  }
+  .provider-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .provider-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+  .provider-card pre {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin: 0;
+  }
+
+  /* In-Depth Guides */
+  .docs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+  .doc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-decoration: none;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .doc-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .doc-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .doc-card h3 {
+    color: var(--text);
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .doc-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 768px) {
+    .cmd-grid { grid-template-columns: 1fr; }
+    .provider-grid { grid-template-columns: 1fr; }
+    .docs-grid { grid-template-columns: 1fr; }
+    .qs-step { flex-direction: column; gap: 0.5rem; }
+  }
+</style>
