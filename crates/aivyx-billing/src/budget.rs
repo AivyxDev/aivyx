@@ -71,11 +71,7 @@ impl BudgetEnforcer {
     ///
     /// Returns `Ok(())` if spending is within limits, or
     /// `Err(AivyxError::RateLimit(...))` if a [`BudgetAction::Pause`] limit is exceeded.
-    pub fn check_budget(
-        &self,
-        tenant_id: Option<&TenantId>,
-        key: &MasterKey,
-    ) -> Result<()> {
+    pub fn check_budget(&self, tenant_id: Option<&TenantId>, key: &MasterKey) -> Result<()> {
         let now = Utc::now();
         let today = now.date_naive();
         let year = now.year();
@@ -94,8 +90,7 @@ impl BudgetEnforcer {
 
         // Check tenant monthly limit
         if let Some(monthly_limit) = self.config.tenant_monthly_usd {
-            let monthly_total =
-                self.ledger.monthly_total(tenant_id, year, month, key)?;
+            let monthly_total = self.ledger.monthly_total(tenant_id, year, month, key)?;
             if monthly_total >= monthly_limit && self.config.on_exceeded == BudgetAction::Pause {
                 return Err(AivyxError::RateLimit(format!(
                     "monthly budget exceeded: ${:.2} of ${:.2} limit",
@@ -118,9 +113,7 @@ mod tests {
 
     fn temp_enforcer(config: BudgetConfig) -> (BudgetEnforcer, MasterKey) {
         let dir = tempfile::tempdir().unwrap();
-        let ledger = Arc::new(
-            CostLedger::open(dir.path().join("costs.db")).unwrap(),
-        );
+        let ledger = Arc::new(CostLedger::open(dir.path().join("costs.db")).unwrap());
         let key = MasterKey::from_bytes([42u8; 32]);
         let enforcer = BudgetEnforcer::new(ledger, config);
         (enforcer, key)

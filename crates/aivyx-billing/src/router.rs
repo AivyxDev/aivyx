@@ -83,10 +83,7 @@ mod tests {
             router.route(&RoutingPurpose::Execution),
             "openai-gpt4o-mini"
         );
-        assert_eq!(
-            router.route(&RoutingPurpose::Embedding),
-            "openai-embedding"
-        );
+        assert_eq!(router.route(&RoutingPurpose::Embedding), "openai-embedding");
     }
 
     #[test]

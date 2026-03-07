@@ -75,11 +75,7 @@ pub async fn list_plugins(
 ) -> Result<impl IntoResponse, ServerError> {
     auth.require_role(AivyxRole::Viewer)?;
     let config = state.config.read().await;
-    let summaries: Vec<PluginSummary> = config
-        .plugins
-        .iter()
-        .map(PluginSummary::from)
-        .collect();
+    let summaries: Vec<PluginSummary> = config.plugins.iter().map(PluginSummary::from).collect();
     Ok(axum::Json(summaries))
 }
 

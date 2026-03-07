@@ -176,9 +176,7 @@ pub async fn tenant_auth_middleware(
 /// Parse `X-Aivyx-Tags` header into a tag map.
 ///
 /// Format: `key1=value1,key2=value2`
-fn parse_tags(
-    request: &Request<axum::body::Body>,
-) -> std::collections::HashMap<String, String> {
+fn parse_tags(request: &Request<axum::body::Body>) -> std::collections::HashMap<String, String> {
     let mut tags = std::collections::HashMap::new();
     if let Some(header) = request
         .headers()

@@ -59,9 +59,7 @@ pub fn validate_dag(steps: &[Step]) -> Result<()> {
     }
 
     if visited != n {
-        Err(AivyxError::Task(
-            "step dependencies contain a cycle".into(),
-        ))
+        Err(AivyxError::Task("step dependencies contain a cycle".into()))
     } else {
         Ok(())
     }
@@ -161,9 +159,7 @@ pub fn topological_order(steps: &[Step]) -> Result<Vec<usize>> {
     }
 
     if order.len() != n {
-        Err(AivyxError::Task(
-            "step dependencies contain a cycle".into(),
-        ))
+        Err(AivyxError::Task("step dependencies contain a cycle".into()))
     } else {
         Ok(order)
     }
@@ -282,7 +278,7 @@ mod tests {
             make_step(0, vec![]),
             make_step(1, vec![0]),
             make_step(2, vec![1]),
-            make_step(3, vec![]),  // independent, should not be skipped
+            make_step(3, vec![]), // independent, should not be skipped
         ];
         steps[0].status = StepStatus::Failed {
             reason: "error".into(),

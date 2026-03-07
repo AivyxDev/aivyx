@@ -35,7 +35,10 @@ mod tests {
 
     #[test]
     fn audio_format_from_filename() {
-        assert_eq!(AudioFormat::from_filename("recording.mp3"), AudioFormat::Mp3);
+        assert_eq!(
+            AudioFormat::from_filename("recording.mp3"),
+            AudioFormat::Mp3
+        );
         assert_eq!(AudioFormat::from_filename("audio.wav"), AudioFormat::Wav);
         assert_eq!(AudioFormat::from_filename("voice.flac"), AudioFormat::Flac);
         assert_eq!(

@@ -269,14 +269,7 @@ mod tests {
         let (store, mk) = temp_store();
         let tid = TenantId::new();
         let (token, record) = store
-            .create_key(
-                tid,
-                "revoke-me",
-                AivyxRole::Viewer,
-                vec![],
-                None,
-                &mk,
-            )
+            .create_key(tid, "revoke-me", AivyxRole::Viewer, vec![], None, &mk)
             .unwrap();
 
         store.revoke_key(&record.key_id, &mk).unwrap();

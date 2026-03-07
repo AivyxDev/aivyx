@@ -167,16 +167,32 @@ impl CostLedger {
 
 /// Check whether a ledger entry matches the given filter criteria.
 fn matches_filter(entry: &LedgerEntry, filter: &CostFilter) -> bool {
-    if filter.tenant_id.as_ref().is_some_and(|tid| entry.tenant_id.as_ref() != Some(tid)) {
+    if filter
+        .tenant_id
+        .as_ref()
+        .is_some_and(|tid| entry.tenant_id.as_ref() != Some(tid))
+    {
         return false;
     }
-    if filter.agent_id.as_ref().is_some_and(|aid| &entry.agent_id != aid) {
+    if filter
+        .agent_id
+        .as_ref()
+        .is_some_and(|aid| &entry.agent_id != aid)
+    {
         return false;
     }
-    if filter.team_name.as_ref().is_some_and(|team| entry.team_name.as_ref() != Some(team)) {
+    if filter
+        .team_name
+        .as_ref()
+        .is_some_and(|team| entry.team_name.as_ref() != Some(team))
+    {
         return false;
     }
-    if filter.model.as_ref().is_some_and(|model| &entry.model != model) {
+    if filter
+        .model
+        .as_ref()
+        .is_some_and(|model| &entry.model != model)
+    {
         return false;
     }
     if filter.from_date.is_some_and(|from| entry.date < from) {
@@ -238,8 +254,12 @@ mod tests {
         let agent_a = AgentId::new();
         let agent_b = AgentId::new();
 
-        ledger.record(&sample_entry(date, 0.10, agent_a), &key).unwrap();
-        ledger.record(&sample_entry(date, 0.20, agent_b), &key).unwrap();
+        ledger
+            .record(&sample_entry(date, 0.10, agent_a), &key)
+            .unwrap();
+        ledger
+            .record(&sample_entry(date, 0.20, agent_b), &key)
+            .unwrap();
 
         let filter = CostFilter {
             agent_id: Some(agent_a),
@@ -257,7 +277,9 @@ mod tests {
 
         for day in 1..=5 {
             let date = NaiveDate::from_ymd_opt(2026, 3, day).unwrap();
-            ledger.record(&sample_entry(date, 0.10, agent), &key).unwrap();
+            ledger
+                .record(&sample_entry(date, 0.10, agent), &key)
+                .unwrap();
         }
 
         let filter = CostFilter {
@@ -321,8 +343,12 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 3, 7).unwrap();
         let agent = AgentId::new();
 
-        ledger.record(&sample_entry(date, 0.10, agent), &key).unwrap();
-        ledger.record(&sample_entry(date, 0.25, agent), &key).unwrap();
+        ledger
+            .record(&sample_entry(date, 0.10, agent), &key)
+            .unwrap();
+        ledger
+            .record(&sample_entry(date, 0.25, agent), &key)
+            .unwrap();
 
         let total = ledger.daily_total(None, date, &key).unwrap();
         assert!((total - 0.35).abs() < 1e-10);
@@ -335,8 +361,12 @@ mod tests {
         let day1 = NaiveDate::from_ymd_opt(2026, 3, 7).unwrap();
         let day2 = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap();
 
-        ledger.record(&sample_entry(day1, 0.10, agent), &key).unwrap();
-        ledger.record(&sample_entry(day2, 0.50, agent), &key).unwrap();
+        ledger
+            .record(&sample_entry(day1, 0.10, agent), &key)
+            .unwrap();
+        ledger
+            .record(&sample_entry(day2, 0.50, agent), &key)
+            .unwrap();
 
         let total = ledger.daily_total(None, day1, &key).unwrap();
         assert!((total - 0.10).abs() < 1e-10);
@@ -349,12 +379,16 @@ mod tests {
 
         for day in [1, 10, 20, 28] {
             let date = NaiveDate::from_ymd_opt(2026, 3, day).unwrap();
-            ledger.record(&sample_entry(date, 1.00, agent), &key).unwrap();
+            ledger
+                .record(&sample_entry(date, 1.00, agent), &key)
+                .unwrap();
         }
 
         // Add an entry in a different month
         let other = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
-        ledger.record(&sample_entry(other, 99.0, agent), &key).unwrap();
+        ledger
+            .record(&sample_entry(other, 99.0, agent), &key)
+            .unwrap();
 
         let total = ledger.monthly_total(None, 2026, 3, &key).unwrap();
         assert!((total - 4.00).abs() < 1e-10);
@@ -366,10 +400,14 @@ mod tests {
         let agent = AgentId::new();
 
         let dec = NaiveDate::from_ymd_opt(2026, 12, 15).unwrap();
-        ledger.record(&sample_entry(dec, 2.50, agent), &key).unwrap();
+        ledger
+            .record(&sample_entry(dec, 2.50, agent), &key)
+            .unwrap();
 
         let jan = NaiveDate::from_ymd_opt(2027, 1, 5).unwrap();
-        ledger.record(&sample_entry(jan, 10.0, agent), &key).unwrap();
+        ledger
+            .record(&sample_entry(jan, 10.0, agent), &key)
+            .unwrap();
 
         let total = ledger.monthly_total(None, 2026, 12, &key).unwrap();
         assert!((total - 2.50).abs() < 1e-10);

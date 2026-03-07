@@ -57,9 +57,10 @@ pub async fn usage_summary(
     let today_usd = state
         .cost_ledger
         .daily_total(auth.tenant_id(), today, &key)?;
-    let month_usd = state
-        .cost_ledger
-        .monthly_total(auth.tenant_id(), now.year(), now.month(), &key)?;
+    let month_usd =
+        state
+            .cost_ledger
+            .monthly_total(auth.tenant_id(), now.year(), now.month(), &key)?;
 
     Ok(axum::Json(UsageSummary {
         today_usd,

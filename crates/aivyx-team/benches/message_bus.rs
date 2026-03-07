@@ -26,16 +26,12 @@ fn bench_message_bus_send(c: &mut Criterion) {
         // Subscribe so sends don't fail due to no receivers
         let _receivers: Vec<_> = names.iter().map(|n| bus.subscribe(n).unwrap()).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("send", agent_count),
-            &bus,
-            |b, bus| {
-                b.iter(|| {
-                    let msg = make_message("agent_0", "agent_1");
-                    black_box(bus.send(msg).unwrap());
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("send", agent_count), &bus, |b, bus| {
+            b.iter(|| {
+                let msg = make_message("agent_0", "agent_1");
+                black_box(bus.send(msg).unwrap());
+            });
+        });
     }
 
     group.finish();
@@ -70,13 +66,9 @@ fn bench_message_bus_creation(c: &mut Criterion) {
 
     for agent_count in [3, 9, 20, 50] {
         let names = agent_names(agent_count);
-        group.bench_with_input(
-            BenchmarkId::new("new", agent_count),
-            &names,
-            |b, names| {
-                b.iter(|| black_box(MessageBus::new(names)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("new", agent_count), &names, |b, names| {
+            b.iter(|| black_box(MessageBus::new(names)));
+        });
     }
 
     group.finish();

@@ -296,8 +296,7 @@ pub async fn extract_profile(
     // Create a temporary LLM provider for the extraction request
     let enc_store = aivyx_crypto::EncryptedStore::open(state.dirs.store_path())?;
     let config = state.config.read().await;
-    let provider =
-        aivyx_llm::create_provider(&config.provider, &enc_store, &state.master_key)?;
+    let provider = aivyx_llm::create_provider(&config.provider, &enc_store, &state.master_key)?;
     drop(config);
 
     let mgr = mgr.lock().await;
@@ -387,10 +386,7 @@ pub async fn graph_full(
         nodes.push(GraphNode { name });
     }
 
-    Ok(axum::Json(GraphResponse {
-        nodes,
-        edges,
-    }))
+    Ok(axum::Json(GraphResponse { nodes, edges }))
 }
 
 /// `GET /memory/graph/entity/:name` — returns the neighborhood around an entity.
@@ -579,8 +575,12 @@ mod tests {
     fn graph_response_serializes() {
         let resp = GraphResponse {
             nodes: vec![
-                GraphNode { name: "Rust".into() },
-                GraphNode { name: "language".into() },
+                GraphNode {
+                    name: "Rust".into(),
+                },
+                GraphNode {
+                    name: "language".into(),
+                },
             ],
             edges: vec![GraphResponseEdge {
                 source: "Rust".into(),

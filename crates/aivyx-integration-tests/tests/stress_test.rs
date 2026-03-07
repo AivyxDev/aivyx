@@ -1509,9 +1509,8 @@ async fn server_path_traversal_prevention() {
     let bearer_token_hash: [u8; 32] = hasher.finalize().into();
 
     std::fs::create_dir_all(dir.join("billing")).unwrap();
-    let cost_ledger = Arc::new(
-        aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap(),
-    );
+    let cost_ledger =
+        Arc::new(aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap());
 
     let agent_dirs = AivyxDirs::new(&dir);
     let state = Arc::new(AppState {
@@ -1522,7 +1521,9 @@ async fn server_path_traversal_prevention() {
         master_key,
         dirs,
         config: Arc::new(tokio::sync::RwLock::new(config)),
-        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,

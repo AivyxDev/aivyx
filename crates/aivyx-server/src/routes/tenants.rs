@@ -112,9 +112,7 @@ pub async fn get_tenant(
 
     let record = store
         .get_tenant(&tenant_id, &state.master_key)?
-        .ok_or_else(|| {
-            ServerError(AivyxError::Config(format!("tenant not found: {id}")))
-        })?;
+        .ok_or_else(|| ServerError(AivyxError::Config(format!("tenant not found: {id}"))))?;
 
     Ok(axum::Json(record))
 }

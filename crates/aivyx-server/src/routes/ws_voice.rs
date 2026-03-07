@@ -42,7 +42,9 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use aivyx_core::SessionId;
-use aivyx_llm::{AudioFormat, TtsOptions, TtsAudioFormat, create_stt_provider, create_tts_provider};
+use aivyx_llm::{
+    AudioFormat, TtsAudioFormat, TtsOptions, create_stt_provider, create_tts_provider,
+};
 
 use crate::app_state::AppState;
 
@@ -87,17 +89,29 @@ fn default_voice() -> String {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum VoiceServerMessage {
     AuthOk,
-    AuthError { message: String },
+    AuthError {
+        message: String,
+    },
     /// Transcription result from STT.
-    Transcript { text: String, is_final: bool },
+    Transcript {
+        text: String,
+        is_final: bool,
+    },
     /// Streamed text from the agent.
-    AgentText { content: String },
+    AgentText {
+        content: String,
+    },
     /// About to start sending TTS audio.
     Speaking,
     /// Turn complete.
-    Done { session_id: String, cost_usd: f64 },
+    Done {
+        session_id: String,
+        cost_usd: f64,
+    },
     /// Error occurred.
-    Error { message: String },
+    Error {
+        message: String,
+    },
     Pong,
 }
 
@@ -155,15 +169,13 @@ async fn handle_voice_connection(socket: WebSocket, state: Arc<AppState>) {
     let writer_handle = tokio::spawn(async move {
         while let Some(msg) = outgoing_rx.recv().await {
             let ws_msg = match msg {
-                OutgoingMessage::Text(server_msg) => {
-                    match serde_json::to_string(&server_msg) {
-                        Ok(json) => Message::Text(json.into()),
-                        Err(e) => {
-                            tracing::error!("Failed to serialize voice WS message: {e}");
-                            continue;
-                        }
+                OutgoingMessage::Text(server_msg) => match serde_json::to_string(&server_msg) {
+                    Ok(json) => Message::Text(json.into()),
+                    Err(e) => {
+                        tracing::error!("Failed to serialize voice WS message: {e}");
+                        continue;
                     }
-                }
+                },
                 OutgoingMessage::Binary(data) => Message::Binary(data.into()),
             };
             let mut sink = writer_sink.lock().await;
@@ -257,8 +269,7 @@ async fn handle_voice_connection(socket: WebSocket, state: Arc<AppState>) {
                             continue;
                         }
 
-                        let audio_data: Vec<u8> =
-                            audio_chunks.into_iter().flatten().collect();
+                        let audio_data: Vec<u8> = audio_chunks.into_iter().flatten().collect();
 
                         // Cancel previous turn
                         {
@@ -525,9 +536,7 @@ async fn run_voice_turn(
 
             match tts_provider.synthesize(sentence, &tts_options).await {
                 Ok(output) => {
-                    let _ = tx_text
-                        .send(OutgoingMessage::Binary(output.audio))
-                        .await;
+                    let _ = tx_text.send(OutgoingMessage::Binary(output.audio)).await;
                 }
                 Err(e) => {
                     tracing::warn!("TTS synthesis failed for sentence: {e}");

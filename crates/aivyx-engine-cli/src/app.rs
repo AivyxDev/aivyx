@@ -54,8 +54,6 @@ pub enum Command {
         prompt: String,
     },
 
-
-
     /// Manage saved chat sessions
     Session {
         #[command(subcommand)]
@@ -73,8 +71,6 @@ pub enum Command {
         #[command(subcommand)]
         action: MemoryAction,
     },
-
-
 
     /// HTTP API server management
     Server {
@@ -136,8 +132,6 @@ pub enum Command {
         #[arg(long)]
         agent: Option<String>,
     },
-
-
 }
 
 #[derive(Subcommand)]
@@ -682,8 +676,6 @@ mod tests {
         }
     }
 
-
-
     #[test]
     fn parse_agent_create_with_role() {
         let cli = parse(&["agent", "create", "my-bot", "--role", "coder"]);
@@ -889,8 +881,6 @@ mod tests {
         ));
     }
 
-
-
     #[test]
     fn parse_server_start_with_flags() {
         let cli = parse(&[
@@ -1079,8 +1069,6 @@ mod tests {
             panic!("expected Digest");
         }
     }
-
-
 
     #[test]
     fn parse_team_run_with_session() {

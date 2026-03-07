@@ -88,7 +88,8 @@ pub struct AppState {
     /// System configuration (wrapped in `RwLock` for hot-reload).
     pub config: Arc<tokio::sync::RwLock<AivyxConfig>>,
     /// Push notification configs for A2A tasks, keyed by task ID.
-    pub push_notification_configs: Arc<tokio::sync::RwLock<HashMap<String, PushNotificationConfig>>>,
+    pub push_notification_configs:
+        Arc<tokio::sync::RwLock<HashMap<String, PushNotificationConfig>>>,
     /// SHA-256 hash of the expected bearer token for constant-time comparison.
     /// Wrapped in `RwLock` to support runtime token rotation.
     pub bearer_token_hash: tokio::sync::RwLock<[u8; 32]>,

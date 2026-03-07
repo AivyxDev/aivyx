@@ -247,7 +247,11 @@ mod tests {
 
         assert_eq!(feedback.role_rankings.len(), 2);
         // coder: 2/2 = 1.0, researcher: 0/2 = 0.0
-        let coder = feedback.role_rankings.iter().find(|(r, _)| r == "coder").unwrap();
+        let coder = feedback
+            .role_rankings
+            .iter()
+            .find(|(r, _)| r == "coder")
+            .unwrap();
         assert!((coder.1 - 1.0).abs() < 0.01);
         let researcher = feedback
             .role_rankings
@@ -268,10 +272,7 @@ mod tests {
                 description: "web_search alone".into(),
                 frequency: 3,
             }],
-            tool_rankings: vec![
-                ("shell".into(), 0.92),
-                ("web_search".into(), 0.50),
-            ],
+            tool_rankings: vec![("shell".into(), 0.92), ("web_search".into(), 0.50)],
             role_rankings: vec![],
         };
 

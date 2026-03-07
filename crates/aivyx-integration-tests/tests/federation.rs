@@ -28,10 +28,7 @@ const TEST_TOKEN: &str = "test-bearer-token-abc123";
 /// so `list_peers` returns an empty list and relay requests to unknown
 /// peers are denied.
 fn setup_federation_state() -> (Arc<AppState>, std::path::PathBuf) {
-    let dir = std::env::temp_dir().join(format!(
-        "aivyx-federation-test-{}",
-        rand::random::<u64>()
-    ));
+    let dir = std::env::temp_dir().join(format!("aivyx-federation-test-{}", rand::random::<u64>()));
     std::fs::create_dir_all(dir.join("agents")).unwrap();
     std::fs::create_dir_all(dir.join("teams")).unwrap();
     std::fs::create_dir_all(dir.join("sessions")).unwrap();
@@ -57,9 +54,8 @@ fn setup_federation_state() -> (Arc<AppState>, std::path::PathBuf) {
     hasher.update(TEST_TOKEN.as_bytes());
     let bearer_token_hash: [u8; 32] = hasher.finalize().into();
 
-    let cost_ledger = Arc::new(
-        aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap(),
-    );
+    let cost_ledger =
+        Arc::new(aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap());
 
     // Build a FederationClient with no peers — federation is "enabled" but
     // has no configured peers, so list_peers returns [] and relay fails.
@@ -167,7 +163,10 @@ async fn federation_peers() {
     let body = response_body(resp).await;
     assert!(body["peers"].is_array(), "peers should be an array");
     let peers = body["peers"].as_array().unwrap();
-    assert!(peers.is_empty(), "peers list should be empty when no peers are configured");
+    assert!(
+        peers.is_empty(),
+        "peers list should be empty when no peers are configured"
+    );
 
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -238,10 +237,7 @@ fn federation_ed25519_signature_roundtrip() {
     // Verify that a tampered body is rejected
     let tampered = b"tampered payload";
     let result = FederationAuth::verify_request(&public_key, &signed_header, tampered);
-    assert!(
-        result.is_err(),
-        "tampered body should fail verification"
-    );
+    assert!(result.is_err(), "tampered body should fail verification");
 
     // Verify that signing with a different instance produces a different signature
     // that cannot be verified with the first instance's public key

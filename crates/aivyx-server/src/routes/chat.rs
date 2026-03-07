@@ -475,12 +475,7 @@ pub fn build_multimodal_content(text: &str, images: &[ImageInput]) -> Content {
 }
 
 /// Allowed image MIME types for the multipart image upload endpoint.
-const ALLOWED_IMAGE_TYPES: &[&str] = &[
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-    "image/gif",
-];
+const ALLOWED_IMAGE_TYPES: &[&str] = &["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 /// `POST /chat/image` — upload images with a message, run an agent turn.
 ///
@@ -511,7 +506,9 @@ pub async fn image_chat(
         match name.as_str() {
             "message" => {
                 let text = field.text().await.map_err(|e| {
-                    ServerError(AivyxError::Http(format!("failed to read message field: {e}")))
+                    ServerError(AivyxError::Http(format!(
+                        "failed to read message field: {e}"
+                    )))
                 })?;
                 message = Some(text);
             }
@@ -765,12 +762,10 @@ mod tests {
 
     #[test]
     fn build_multimodal_content_creates_blocks() {
-        let images = vec![
-            ImageInput {
-                media_type: "image/jpeg".into(),
-                data: "abc123".into(),
-            },
-        ];
+        let images = vec![ImageInput {
+            media_type: "image/jpeg".into(),
+            data: "abc123".into(),
+        }];
         let content = build_multimodal_content("describe this", &images);
         assert!(content.has_images());
         assert_eq!(content.text(), "describe this");

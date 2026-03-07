@@ -223,7 +223,10 @@ impl SpecialistPool {
             let mut members = ctx.members.clone();
             members.push((agent_name.to_string(), role.to_string()));
             // The context will be rebuilt on next delegation via format_for_role()
-            info!("Registered spawned specialist '{}' (role: {})", agent_name, role);
+            info!(
+                "Registered spawned specialist '{}' (role: {})",
+                agent_name, role
+            );
         }
     }
 
@@ -761,9 +764,10 @@ impl Tool for DelegateTaskTool {
                         task_owned.clone(),
                     );
                     if let Ok(mgr) = mgr.try_lock()
-                        && let Err(e) = mgr.record_outcome(&record) {
-                            warn!("Failed to record async delegation outcome: {e}");
-                        }
+                        && let Err(e) = mgr.record_outcome(&record)
+                    {
+                        warn!("Failed to record async delegation outcome: {e}");
+                    }
                 }
 
                 // Update job tracker
@@ -866,9 +870,10 @@ impl Tool for DelegateTaskTool {
                     task.to_string(),
                 );
                 if let Ok(mgr) = mgr.try_lock()
-                    && let Err(e) = mgr.record_outcome(&record) {
-                        warn!("Failed to record delegation outcome: {e}");
-                    }
+                    && let Err(e) = mgr.record_outcome(&record)
+                {
+                    warn!("Failed to record delegation outcome: {e}");
+                }
             }
         }
 

@@ -60,10 +60,7 @@ impl AuthContext {
         role: AivyxRole,
     ) -> Self {
         Self {
-            principal: Principal::TenantUser {
-                tenant_id,
-                user_id,
-            },
+            principal: Principal::TenantUser { tenant_id, user_id },
             tenant: Some(TenantContext {
                 tenant_id,
                 tenant_name,
@@ -150,12 +147,8 @@ mod tests {
     #[test]
     fn tenant_user_context() {
         let tid = TenantId::new();
-        let ctx = AuthContext::tenant_user(
-            tid,
-            "Acme Corp".into(),
-            "alice".into(),
-            AivyxRole::Operator,
-        );
+        let ctx =
+            AuthContext::tenant_user(tid, "Acme Corp".into(), "alice".into(), AivyxRole::Operator);
         assert_eq!(ctx.role, AivyxRole::Operator);
         assert!(ctx.tenant.is_some());
         assert_eq!(ctx.tenant.as_ref().unwrap().tenant_id, tid);

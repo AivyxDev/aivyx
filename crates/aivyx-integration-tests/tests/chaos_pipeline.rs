@@ -6,10 +6,10 @@
 use std::sync::Arc;
 
 use aivyx_server::middleware::chaos::{ChaosConfig, ChaosLayer};
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::get;
-use axum::Router;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
@@ -132,7 +132,10 @@ async fn chaos_multiple_fault_types() {
 
     let (status, body) = get_health(router).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body.is_empty(), "expected empty body after latency + corruption, got: {body}");
+    assert!(
+        body.is_empty(),
+        "expected empty body after latency + corruption, got: {body}"
+    );
 }
 
 #[test]

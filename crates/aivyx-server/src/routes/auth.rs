@@ -52,7 +52,10 @@ pub async fn me(auth: AuthContextExt) -> impl IntoResponse {
     let principal = format!("{:?}", auth.principal);
     let role = auth.role.to_string();
     let (tenant_id, tenant_name) = match &auth.tenant {
-        Some(ctx) => (Some(ctx.tenant_id.to_string()), Some(ctx.tenant_name.clone())),
+        Some(ctx) => (
+            Some(ctx.tenant_id.to_string()),
+            Some(ctx.tenant_name.clone()),
+        ),
         None => (None, None),
     };
 

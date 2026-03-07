@@ -18,8 +18,8 @@ use std::sync::Arc;
 use aivyx_agent::AgentProfile;
 use aivyx_core::a2a::{
     A2aArtifact, A2aMessage, A2aPart, A2aRole, A2aTask, A2aTaskState, A2aTaskStatus,
-    AgentCard, AgentAuthentication, AgentCapabilities, AgentSkill, JsonRpcRequest,
-    JsonRpcResponse, PushNotificationConfig, TaskStatusUpdateEvent,
+    AgentAuthentication, AgentCapabilities, AgentCard, AgentSkill, JsonRpcRequest, JsonRpcResponse,
+    PushNotificationConfig, TaskStatusUpdateEvent,
 };
 use aivyx_core::{AivyxError, TaskId};
 use aivyx_crypto::derive_task_key;
@@ -207,7 +207,9 @@ async fn handle_task_send(
             message: Some(A2aMessage {
                 role: A2aRole::Agent,
                 parts: vec![A2aPart::Text {
-                    text: format!("Task created and queued for execution with agent '{agent_name}'"),
+                    text: format!(
+                        "Task created and queued for execution with agent '{agent_name}'"
+                    ),
                 }],
             }),
             timestamp: chrono::Utc::now().to_rfc3339(),
@@ -322,7 +324,10 @@ pub async fn a2a_stream_handler(
         return Err(axum::Json(JsonRpcResponse::error(
             req.id.clone(),
             -32601,
-            format!("streaming endpoint only supports tasks/sendSubscribe, got: {}", req.method),
+            format!(
+                "streaming endpoint only supports tasks/sendSubscribe, got: {}",
+                req.method
+            ),
         )));
     }
 
@@ -397,7 +402,9 @@ pub async fn a2a_stream_handler(
                 message: Some(A2aMessage {
                     role: A2aRole::Agent,
                     parts: vec![A2aPart::Text {
-                        text: format!("Task created and queued for execution with agent '{agent_name}'"),
+                        text: format!(
+                            "Task created and queued for execution with agent '{agent_name}'"
+                        ),
                     }],
                 }),
                 timestamp: chrono::Utc::now().to_rfc3339(),

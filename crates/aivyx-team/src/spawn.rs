@@ -5,8 +5,8 @@
 //! composition where the lead discovers it needs expertise that wasn't
 //! pre-configured in the team definition.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use tracing::info;

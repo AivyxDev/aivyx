@@ -122,7 +122,10 @@ pub async fn build_router(state: Arc<AppState>) -> axum::Router {
         // A2A JSON-RPC 2.0 — task operations via Google A2A protocol
         .route("/a2a", axum::routing::post(routes::a2a::a2a_handler))
         // A2A SSE streaming — tasks/sendSubscribe
-        .route("/a2a/stream", axum::routing::post(routes::a2a::a2a_stream_handler))
+        .route(
+            "/a2a/stream",
+            axum::routing::post(routes::a2a::a2a_stream_handler),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::rate_limit::rate_limit_task,
@@ -314,20 +317,55 @@ pub async fn build_router(state: Arc<AppState>) -> axum::Router {
             axum::routing::post(routes::admin::rotate_token),
         )
         // --- Tenant administration endpoints ---
-        .route("/tenants", axum::routing::get(routes::tenants::list_tenants).post(routes::tenants::create_tenant))
-        .route("/tenants/{id}", axum::routing::get(routes::tenants::get_tenant).delete(routes::tenants::delete_tenant))
-        .route("/tenants/{id}/suspend", axum::routing::post(routes::tenants::suspend_tenant))
-        .route("/tenants/{id}/unsuspend", axum::routing::post(routes::tenants::unsuspend_tenant))
-        .route("/tenants/{id}/keys", axum::routing::get(routes::tenants::list_api_keys).post(routes::tenants::create_api_key))
-        .route("/tenants/{id}/keys/{key_id}", axum::routing::delete(routes::tenants::revoke_api_key))
+        .route(
+            "/tenants",
+            axum::routing::get(routes::tenants::list_tenants).post(routes::tenants::create_tenant),
+        )
+        .route(
+            "/tenants/{id}",
+            axum::routing::get(routes::tenants::get_tenant).delete(routes::tenants::delete_tenant),
+        )
+        .route(
+            "/tenants/{id}/suspend",
+            axum::routing::post(routes::tenants::suspend_tenant),
+        )
+        .route(
+            "/tenants/{id}/unsuspend",
+            axum::routing::post(routes::tenants::unsuspend_tenant),
+        )
+        .route(
+            "/tenants/{id}/keys",
+            axum::routing::get(routes::tenants::list_api_keys)
+                .post(routes::tenants::create_api_key),
+        )
+        .route(
+            "/tenants/{id}/keys/{key_id}",
+            axum::routing::delete(routes::tenants::revoke_api_key),
+        )
         // --- Workflow endpoints ---
-        .route("/workflows", axum::routing::get(routes::workflows::list_workflows).post(routes::workflows::create_workflow))
-        .route("/workflows/{id}", axum::routing::get(routes::workflows::get_workflow))
-        .route("/workflows/{id}/pause", axum::routing::post(routes::workflows::pause_workflow))
-        .route("/workflows/{id}/resume", axum::routing::post(routes::workflows::resume_workflow))
+        .route(
+            "/workflows",
+            axum::routing::get(routes::workflows::list_workflows)
+                .post(routes::workflows::create_workflow),
+        )
+        .route(
+            "/workflows/{id}",
+            axum::routing::get(routes::workflows::get_workflow),
+        )
+        .route(
+            "/workflows/{id}/pause",
+            axum::routing::post(routes::workflows::pause_workflow),
+        )
+        .route(
+            "/workflows/{id}/resume",
+            axum::routing::post(routes::workflows::resume_workflow),
+        )
         // --- Usage / billing endpoints ---
         .route("/usage", axum::routing::get(routes::usage::usage_summary))
-        .route("/usage/daily", axum::routing::get(routes::usage::usage_daily))
+        .route(
+            "/usage/daily",
+            axum::routing::get(routes::usage::usage_daily),
+        )
         // --- Federation endpoints ---
         .route(
             "/federation/ping",
@@ -423,16 +461,21 @@ pub async fn build_router(state: Arc<AppState>) -> axum::Router {
                         path = %request.uri().path(),
                     )
                 })
-                .on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
-                    let status = response.status().as_u16().to_string();
-                    metrics::counter!("http_requests_total", "status" => status).increment(1);
-                    metrics::histogram!("http_request_duration_seconds").record(latency.as_secs_f64());
-                    tracing::info!(
-                        status = %response.status().as_u16(),
-                        latency_ms = %latency.as_millis(),
-                        "response"
-                    );
-                }),
+                .on_response(
+                    |response: &axum::http::Response<_>,
+                     latency: std::time::Duration,
+                     _span: &tracing::Span| {
+                        let status = response.status().as_u16().to_string();
+                        metrics::counter!("http_requests_total", "status" => status).increment(1);
+                        metrics::histogram!("http_request_duration_seconds")
+                            .record(latency.as_secs_f64());
+                        tracing::info!(
+                            status = %response.status().as_u16(),
+                            latency_ms = %latency.as_millis(),
+                            "response"
+                        );
+                    },
+                ),
         )
         .layer(cors)
         .with_state(state);
@@ -573,7 +616,9 @@ pub fn build_app_state(
         master_key: MasterKey::from_bytes([0u8; 32]), // placeholder
         dirs,
         config: Arc::new(tokio::sync::RwLock::new(config)),
-        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,
@@ -646,7 +691,9 @@ pub fn build_app_state_with_keys(
         master_key: store_key,
         dirs,
         config: Arc::new(tokio::sync::RwLock::new(config)),
-        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode,
@@ -671,10 +718,7 @@ type TenantStores = (
 
 /// Initialize tenant and API key stores when multi-tenancy is enabled.
 fn build_tenant_stores(dirs: &AivyxDirs, config: &AivyxConfig) -> Result<TenantStores> {
-    let enabled = config
-        .tenants
-        .as_ref()
-        .is_some_and(|t| t.enabled);
+    let enabled = config.tenants.as_ref().is_some_and(|t| t.enabled);
 
     if !enabled {
         return Ok((None, None, false));
@@ -731,11 +775,16 @@ fn build_memory_manager(
 fn build_billing(
     dirs: &AivyxDirs,
     config: &AivyxConfig,
-) -> Result<(Arc<aivyx_billing::CostLedger>, Option<Arc<aivyx_billing::BudgetEnforcer>>)> {
+) -> Result<(
+    Arc<aivyx_billing::CostLedger>,
+    Option<Arc<aivyx_billing::BudgetEnforcer>>,
+)> {
     let billing_dir = dirs.root().join("billing");
     std::fs::create_dir_all(&billing_dir)?;
 
-    let ledger = Arc::new(aivyx_billing::CostLedger::open(billing_dir.join("costs.db"))?);
+    let ledger = Arc::new(aivyx_billing::CostLedger::open(
+        billing_dir.join("costs.db"),
+    )?);
 
     let enforcer = config.billing.as_ref().map(|billing_cfg| {
         let budget_config = aivyx_billing::BudgetConfig {
@@ -747,7 +796,10 @@ fn build_billing(
             alert_threshold: billing_cfg.alert_threshold,
             alert_webhook: billing_cfg.alert_webhook.clone(),
         };
-        Arc::new(aivyx_billing::BudgetEnforcer::new(ledger.clone(), budget_config))
+        Arc::new(aivyx_billing::BudgetEnforcer::new(
+            ledger.clone(),
+            budget_config,
+        ))
     });
 
     Ok((ledger, enforcer))

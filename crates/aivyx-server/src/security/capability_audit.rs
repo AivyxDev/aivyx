@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use aivyx_agent::AgentProfile;
-use aivyx_core::{AutonomyTier, AivyxError, CapabilityScope};
+use aivyx_core::{AivyxError, AutonomyTier, CapabilityScope};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
@@ -359,10 +359,12 @@ Custom = "mcp:github"
         std::fs::write(dir.path().join("ns-agent.toml"), toml_content).unwrap();
 
         let report = audit_agent_capabilities(dir.path()).unwrap();
-        assert!(!report.warnings.iter().any(|w| matches!(
-            w,
-            CapabilityWarning::UnrestrictedCustom { .. }
-        )));
+        assert!(
+            !report
+                .warnings
+                .iter()
+                .any(|w| matches!(w, CapabilityWarning::UnrestrictedCustom { .. }))
+        );
     }
 
     #[test]
@@ -434,10 +436,12 @@ Network = { hosts = [], ports = [] }
         std::fs::write(dir.path().join("leash-agent.toml"), toml_content).unwrap();
 
         let report = audit_agent_capabilities(dir.path()).unwrap();
-        assert!(!report.warnings.iter().any(|w| matches!(
-            w,
-            CapabilityWarning::HighAutonomyWithBroadScope { .. }
-        )));
+        assert!(
+            !report
+                .warnings
+                .iter()
+                .any(|w| matches!(w, CapabilityWarning::HighAutonomyWithBroadScope { .. }))
+        );
     }
 
     #[test]

@@ -54,13 +54,15 @@ pub fn score_skills(outcomes: &[OutcomeRecord]) -> Vec<SkillScore> {
 
     let mut scores: Vec<SkillScore> = stats
         .into_iter()
-        .map(|(name, (total, successes, duration_sum, last))| SkillScore {
-            skill_name: name,
-            activations: total,
-            success_rate: successes as f64 / total as f64,
-            avg_duration_ms: duration_sum as f64 / total as f64,
-            last_used: last,
-        })
+        .map(
+            |(name, (total, successes, duration_sum, last))| SkillScore {
+                skill_name: name,
+                activations: total,
+                success_rate: successes as f64 / total as f64,
+                avg_duration_ms: duration_sum as f64 / total as f64,
+                last_used: last,
+            },
+        )
         .collect();
 
     // Sort by success_rate descending, then by name for stability
@@ -120,7 +122,10 @@ mod tests {
         assert!((shell.avg_duration_ms - 200.0).abs() < 0.01);
 
         // web_search: 1/2 success, avg 500ms
-        let ws = scores.iter().find(|s| s.skill_name == "web_search").unwrap();
+        let ws = scores
+            .iter()
+            .find(|s| s.skill_name == "web_search")
+            .unwrap();
         assert_eq!(ws.activations, 2);
         assert!((ws.success_rate - 0.5).abs() < 0.01);
         assert!((ws.avg_duration_ms - 500.0).abs() < 0.01);

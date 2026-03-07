@@ -36,12 +36,13 @@ fn default_days() -> u64 {
 /// `GET /metrics` — Prometheus exposition format.
 ///
 /// Public endpoint (no auth) for Prometheus scraping.
-pub async fn prometheus_metrics(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn prometheus_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match &state.prometheus_handle {
         Some(handle) => (
-            [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "text/plain; version=0.0.4",
+            )],
             handle.render(),
         )
             .into_response(),
@@ -177,7 +178,11 @@ pub async fn cost_rollup(
     }
 
     let mut breakdown: Vec<AgentCost> = groups.into_values().collect();
-    breakdown.sort_by(|a, b| b.cost_usd.partial_cmp(&a.cost_usd).unwrap_or(std::cmp::Ordering::Equal));
+    breakdown.sort_by(|a, b| {
+        b.cost_usd
+            .partial_cmp(&a.cost_usd)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(axum::Json(CostRollup {
         from,

@@ -190,7 +190,9 @@ async fn agent_card_skills_from_profiles() {
     let resp = router.oneshot(req).await.unwrap();
     let body = response_body(resp).await;
 
-    let skills = body["skills"].as_array().expect("skills should be an array");
+    let skills = body["skills"]
+        .as_array()
+        .expect("skills should be an array");
     assert!(
         !skills.is_empty(),
         "skills should be populated from agent profiles"
@@ -293,10 +295,13 @@ async fn task_send_returns_submitted() {
     // Set up a dummy encrypted store with a fake API key so create_mission
     // can build an LLM provider. The key is not valid for real API calls,
     // but the planner will fail gracefully after mission creation.
-    let store =
-        aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
+    let store = aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
     store
-        .put("claude_api_key", b"sk-test-dummy-key-for-a2a-tests", &state.master_key)
+        .put(
+            "claude_api_key",
+            b"sk-test-dummy-key-for-a2a-tests",
+            &state.master_key,
+        )
         .unwrap();
 
     let router = build_router(state).await;
@@ -345,10 +350,13 @@ async fn task_send_has_task_id() {
     let (state, dir) = setup_test_state();
 
     // Set up dummy API key for create_mission
-    let store =
-        aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
+    let store = aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
     store
-        .put("claude_api_key", b"sk-test-dummy-key-for-a2a-tests", &state.master_key)
+        .put(
+            "claude_api_key",
+            b"sk-test-dummy-key-for-a2a-tests",
+            &state.master_key,
+        )
         .unwrap();
 
     let router = build_router(state).await;
@@ -554,10 +562,13 @@ async fn stream_returns_sse_content_type() {
     let (state, dir) = setup_test_state();
 
     // Set up dummy API key for create_mission
-    let store =
-        aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
+    let store = aivyx_crypto::EncryptedStore::open(state.dirs.store_path()).unwrap();
     store
-        .put("claude_api_key", b"sk-test-dummy-key-for-a2a-tests", &state.master_key)
+        .put(
+            "claude_api_key",
+            b"sk-test-dummy-key-for-a2a-tests",
+            &state.master_key,
+        )
         .unwrap();
 
     let router = build_router(state).await;
@@ -607,9 +618,7 @@ async fn stream_returns_sse_content_type() {
             "expected JSON-RPC error in fallback response, got: {body}"
         );
     } else {
-        panic!(
-            "expected text/event-stream or application/json content type, got: {content_type}"
-        );
+        panic!("expected text/event-stream or application/json content type, got: {content_type}");
     }
 
     std::fs::remove_dir_all(&dir).ok();

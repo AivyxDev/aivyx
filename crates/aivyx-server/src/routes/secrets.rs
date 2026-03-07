@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
 use crate::error::ServerError;
 use crate::extractors::AuthContextExt;
-use aivyx_tenant::AivyxRole;
 use crate::validation::validate_secret_name;
+use aivyx_tenant::AivyxRole;
 
 /// Response for secret listing.
 #[derive(Debug, Serialize)]

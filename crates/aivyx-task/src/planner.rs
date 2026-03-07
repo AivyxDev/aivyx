@@ -272,9 +272,7 @@ async fn build_memory_block(
 
         for (tool, (successes, total)) in &sorted_tools {
             let rate = (*successes as f64 / *total as f64 * 100.0) as u32;
-            block.push_str(&format!(
-                "- {tool}: {rate}% success ({total} uses)\n"
-            ));
+            block.push_str(&format!("- {tool}: {rate}% success ({total} uses)\n"));
         }
     }
 

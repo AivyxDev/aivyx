@@ -55,7 +55,6 @@ pub enum StageCondition {
     OnFailure,
 }
 
-
 /// A single stage within a workflow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStage {
@@ -160,7 +159,9 @@ impl Workflow {
         let prompt = if let Some(prev) = self.prev_result() {
             stage.prompt.replace("{prev_result}", prev)
         } else {
-            stage.prompt.replace("{prev_result}", "(no previous result)")
+            stage
+                .prompt
+                .replace("{prev_result}", "(no previous result)")
         };
         Some(prompt)
     }

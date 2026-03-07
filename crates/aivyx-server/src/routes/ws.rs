@@ -543,11 +543,10 @@ async fn run_agent_turn(
     // Restore conversation if session_id provided
     if let Some(ref id_str) = params.session_id
         && let Ok(sid) = id_str.parse::<SessionId>()
-        && let Ok(Some(persisted)) = state.session_store.load(
-            &sid,
-            &state.master_key,
-            config.memory.session_max_age_hours,
-        )
+        && let Ok(Some(persisted)) =
+            state
+                .session_store
+                .load(&sid, &state.master_key, config.memory.session_max_age_hours)
     {
         agent.restore_conversation(persisted.messages);
     }
@@ -791,7 +790,12 @@ mod tests {
         }"#;
         let msg: ClientMessage = serde_json::from_str(json).unwrap();
         match msg {
-            ClientMessage::Message { text, images, agent, .. } => {
+            ClientMessage::Message {
+                text,
+                images,
+                agent,
+                ..
+            } => {
                 assert_eq!(text, "what is this?");
                 assert_eq!(images.len(), 1);
                 assert_eq!(images[0].media_type, "image/png");

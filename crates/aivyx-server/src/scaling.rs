@@ -72,7 +72,10 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let parsed: ScalingConfig = serde_json::from_str(&json).unwrap();
         assert!(parsed.stateless_mode);
-        assert_eq!(parsed.session_affinity, SessionAffinityStrategy::ConsistentHashing);
+        assert_eq!(
+            parsed.session_affinity,
+            SessionAffinityStrategy::ConsistentHashing
+        );
         assert_eq!(parsed.instance_id, "node-1");
     }
 
@@ -80,7 +83,10 @@ mod tests {
     fn session_affinity_strategy_serde() {
         let strategies = vec![
             (SessionAffinityStrategy::None, "\"none\""),
-            (SessionAffinityStrategy::ConsistentHashing, "\"consistent_hashing\""),
+            (
+                SessionAffinityStrategy::ConsistentHashing,
+                "\"consistent_hashing\"",
+            ),
             (SessionAffinityStrategy::HeaderBased, "\"header_based\""),
         ];
         for (strategy, expected) in strategies {

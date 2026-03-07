@@ -195,7 +195,6 @@ async fn main() {
         app::Command::Backup { output } => cmd::backup::create(&output),
         app::Command::Restore { archive } => cmd::backup::restore(&archive),
         app::Command::Digest { agent } => cmd::digest::run(agent.as_deref()).await,
-
     };
 
     if let Err(e) = result {

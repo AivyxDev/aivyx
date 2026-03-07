@@ -14,7 +14,7 @@ use aivyx_crypto::{EncryptedStore, MasterKey};
 use aivyx_llm::create_provider;
 use aivyx_memory::{MemoryManager, OutcomeRecord, OutcomeSource};
 use chrono::Utc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tokio::task::JoinSet;
 use tracing;
 
@@ -255,8 +255,7 @@ impl TaskEngine {
                                 "Reflection rejected step {target_step} (depth {current_depth}/{max_depth}): {feedback}",
                             );
                             mission.steps[step_idx].status = StepStatus::Completed;
-                            mission.steps[step_idx].result =
-                                Some(format!("rejected: {feedback}"));
+                            mission.steps[step_idx].result = Some(format!("rejected: {feedback}"));
                             mission.steps[step_idx].completed_at = Some(Utc::now());
 
                             // Insert retry + re-reflect steps at the end
@@ -349,7 +348,14 @@ impl TaskEngine {
                 Err(e) => {
                     let step_elapsed = step_start.elapsed().as_millis() as u64;
                     if self
-                        .handle_step_failure(mission, step_idx, &step_desc, &e, progress, step_elapsed)
+                        .handle_step_failure(
+                            mission,
+                            step_idx,
+                            &step_desc,
+                            &e,
+                            progress,
+                            step_elapsed,
+                        )
                         .await?
                     {
                         return Ok(());
@@ -420,8 +426,12 @@ impl TaskEngine {
 
             // Spawn each ready step concurrently with its own agent
             // Tuple: (step_idx, step_desc, result, duration_ms)
-            let mut join_set: JoinSet<(usize, String, std::result::Result<String, AivyxError>, u64)> =
-                JoinSet::new();
+            let mut join_set: JoinSet<(
+                usize,
+                String,
+                std::result::Result<String, AivyxError>,
+                u64,
+            )> = JoinSet::new();
 
             for (step_idx, step_prompt, step_desc) in step_prompts {
                 let session = Arc::clone(&self.session);
@@ -840,9 +850,10 @@ impl TaskEngine {
                 goal.to_string(),
             );
             if let Ok(mgr) = mgr.try_lock()
-                && let Err(e) = mgr.record_outcome(&record) {
-                    tracing::warn!("Failed to record step outcome: {e}");
-                }
+                && let Err(e) = mgr.record_outcome(&record)
+            {
+                tracing::warn!("Failed to record step outcome: {e}");
+            }
         }
     }
 

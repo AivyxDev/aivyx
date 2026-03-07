@@ -64,7 +64,6 @@ pub enum StepKind {
     },
 }
 
-
 /// Whether a mission uses sequential or DAG-based execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {

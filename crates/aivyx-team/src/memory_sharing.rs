@@ -25,10 +25,7 @@ pub struct TeamMemoryQueryTool {
 
 impl TeamMemoryQueryTool {
     /// Create a new team memory query tool.
-    pub fn new(
-        memory_manager: Arc<Mutex<MemoryManager>>,
-        team_agent_ids: Vec<AgentId>,
-    ) -> Self {
+    pub fn new(memory_manager: Arc<Mutex<MemoryManager>>, team_agent_ids: Vec<AgentId>) -> Self {
         Self {
             id: ToolId::new(),
             memory_manager,
