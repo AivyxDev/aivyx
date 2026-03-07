@@ -29,6 +29,10 @@ pub struct DialogueConfig {
     /// Maximum messages a single agent can send per delegation turn.
     #[serde(default = "default_max_messages_per_turn")]
     pub max_messages_per_turn: u32,
+    /// Maximum number of specialists the lead can spawn dynamically.
+    /// Set to 0 to disable dynamic spawning.
+    #[serde(default = "default_max_spawned_specialists")]
+    pub max_spawned_specialists: usize,
 }
 
 fn default_enable_peer_dialogue() -> bool {
@@ -39,11 +43,16 @@ fn default_max_messages_per_turn() -> u32 {
     10
 }
 
+fn default_max_spawned_specialists() -> usize {
+    5
+}
+
 impl Default for DialogueConfig {
     fn default() -> Self {
         Self {
             enable_peer_dialogue: default_enable_peer_dialogue(),
             max_messages_per_turn: default_max_messages_per_turn(),
+            max_spawned_specialists: default_max_spawned_specialists(),
         }
     }
 }
@@ -151,6 +160,7 @@ mod tests {
             dialogue: DialogueConfig {
                 enable_peer_dialogue: false,
                 max_messages_per_turn: 5,
+                max_spawned_specialists: 3,
             },
         };
 

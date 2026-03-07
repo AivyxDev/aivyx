@@ -13,6 +13,7 @@ pub mod message_tools;
 pub mod nonagon;
 pub mod runtime;
 pub mod session_store;
+pub mod spawn;
 pub mod suggest;
 pub mod synthesize;
 pub mod verify;

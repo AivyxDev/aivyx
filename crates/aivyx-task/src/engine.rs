@@ -557,26 +557,64 @@ impl TaskEngine {
                 .await;
         }
 
-        // If no channel is available, auto-resolve based on timeout policy
-        let approved = if channel.is_some() {
+        // Emit approval request events
+        self.audit(AuditEvent::TaskApprovalRequested {
+            task_id: mission.id.to_string(),
+            step_index: step_idx,
+            context: context.to_string(),
+        });
+
+        if let Some(sink) = progress {
+            let _ = sink
+                .emit(ProgressEvent::ApprovalRequested {
+                    task_id: mission.id,
+                    step_index: step_idx,
+                    context: context.to_string(),
+                    timeout_secs,
+                    timestamp: Utc::now(),
+                })
+                .await;
+        }
+
+        // Resolve the approval based on channel availability and timeout policy
+        let (approved, method) = if channel.is_some() {
             // TODO: Send approval request through channel and wait for response.
             // For now, auto-approve when a channel is present. The full
-            // implementation will use the channel's approval protocol in Task 15.
+            // WebSocket implementation will send a TaskApprovalRequest and
+            // block until a TaskApprovalResponse is received.
             tracing::info!(
                 "Approval gate at step {step_idx}: {context} (auto-approved, channel present)"
             );
-            true
+            (true, "channel_auto")
         } else if auto_approve_on_timeout {
             tracing::info!(
                 "Approval gate at step {step_idx}: {context} (auto-approved, no channel)"
             );
-            true
+            (true, "timeout_auto")
         } else {
             tracing::warn!(
                 "Approval gate at step {step_idx}: {context} (rejected, no channel and auto_approve_on_timeout=false)"
             );
-            false
+            (false, "timeout_reject")
         };
+
+        self.audit(AuditEvent::TaskApprovalResolved {
+            task_id: mission.id.to_string(),
+            step_index: step_idx,
+            approved,
+            method: method.to_string(),
+        });
+
+        if let Some(sink) = progress {
+            let _ = sink
+                .emit(ProgressEvent::ApprovalReceived {
+                    task_id: mission.id,
+                    step_index: step_idx,
+                    approved,
+                    timestamp: Utc::now(),
+                })
+                .await;
+        }
 
         if approved {
             mission.steps[step_idx].status = StepStatus::Completed;

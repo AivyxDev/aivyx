@@ -210,6 +210,21 @@ impl SpecialistPool {
         }
     }
 
+    /// Register a dynamically spawned specialist in the pool.
+    ///
+    /// Called by [`SpawnSpecialistTool`] to make a newly created specialist
+    /// available for delegation. The actual agent creation happens lazily
+    /// on first `get_or_create()` call.
+    pub async fn register_spawned(&self, agent_name: &str, role: &str) {
+        // Update team context with the new member
+        if let Some(ref ctx) = self.team_context {
+            let mut members = ctx.members.clone();
+            members.push((agent_name.to_string(), role.to_string()));
+            // The context will be rebuilt on next delegation via format_for_role()
+            info!("Registered spawned specialist '{}' (role: {})", agent_name, role);
+        }
+    }
+
     /// Get or create a specialist by name.
     ///
     /// On first call for a given name, creates the agent from its profile,

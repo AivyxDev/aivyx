@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use aivyx_core::Result;
 use chrono::{DateTime, Utc};
@@ -25,8 +26,11 @@ pub struct TeamMessage {
 /// Uses `broadcast` channels so multiple consumers can subscribe to each
 /// agent's inbox. This allows both the lead agent and specialists to
 /// receive messages — unlike `mpsc` where only one consumer exists.
+///
+/// The bus supports dynamic registration of new agents via [`register_agent`]
+/// for specialist agents spawned mid-session.
 pub struct MessageBus {
-    senders: HashMap<String, broadcast::Sender<TeamMessage>>,
+    senders: RwLock<HashMap<String, broadcast::Sender<TeamMessage>>>,
 }
 
 impl MessageBus {
@@ -39,12 +43,35 @@ impl MessageBus {
             senders.insert(name.clone(), tx);
         }
 
-        Self { senders }
+        Self {
+            senders: RwLock::new(senders),
+        }
+    }
+
+    /// Register a new agent dynamically (for spawned specialists).
+    ///
+    /// Creates a new broadcast channel for the agent and returns a receiver.
+    /// If the agent is already registered, returns a new subscription.
+    pub fn register_agent(&self, name: &str) -> Result<broadcast::Receiver<TeamMessage>> {
+        let mut senders = self.senders.write().map_err(|e| {
+            aivyx_core::AivyxError::Agent(format!("message bus lock poisoned: {e}"))
+        })?;
+
+        if let Some(tx) = senders.get(name) {
+            Ok(tx.subscribe())
+        } else {
+            let (tx, rx) = broadcast::channel(64);
+            senders.insert(name.to_string(), tx);
+            Ok(rx)
+        }
     }
 
     /// Send a message to a specific agent.
     pub fn send(&self, msg: TeamMessage) -> Result<()> {
-        let tx = self.senders.get(&msg.to).ok_or_else(|| {
+        let senders = self.senders.read().map_err(|e| {
+            aivyx_core::AivyxError::Agent(format!("message bus lock poisoned: {e}"))
+        })?;
+        let tx = senders.get(&msg.to).ok_or_else(|| {
             aivyx_core::AivyxError::Agent(format!("unknown recipient: {}", msg.to))
         })?;
         tx.send(msg)
@@ -54,7 +81,10 @@ impl MessageBus {
 
     /// Broadcast a message to all agents except the sender.
     pub fn broadcast(&self, msg: TeamMessage) -> Result<()> {
-        for (name, tx) in &self.senders {
+        let senders = self.senders.read().map_err(|e| {
+            aivyx_core::AivyxError::Agent(format!("message bus lock poisoned: {e}"))
+        })?;
+        for (name, tx) in senders.iter() {
             if name != &msg.from {
                 let mut m = msg.clone();
                 m.to = name.clone();
@@ -73,7 +103,8 @@ impl MessageBus {
     /// independent receiver. This enables specialists to receive messages
     /// even when the lead agent also has a subscription.
     pub fn subscribe(&self, name: &str) -> Option<broadcast::Receiver<TeamMessage>> {
-        self.senders.get(name).map(|tx| tx.subscribe())
+        let senders = self.senders.read().ok()?;
+        senders.get(name).map(|tx| tx.subscribe())
     }
 }
 
@@ -171,6 +202,41 @@ mod tests {
 
         let second = bus.subscribe("alice");
         assert!(second.is_some()); // Unlike take_receiver, this succeeds
+    }
+
+    #[tokio::test]
+    async fn register_dynamic_agent() {
+        let names = vec!["alice".into()];
+        let bus = MessageBus::new(&names);
+
+        // Dynamic agent not yet known
+        assert!(bus.subscribe("dynamic_agent").is_none());
+
+        // Register dynamically
+        let mut rx = bus.register_agent("dynamic_agent").unwrap();
+
+        // Now we can send messages to it
+        let msg = TeamMessage {
+            from: "alice".into(),
+            to: "dynamic_agent".into(),
+            content: "welcome".into(),
+            message_type: "text".into(),
+            timestamp: Utc::now(),
+        };
+        bus.send(msg).unwrap();
+        let received = rx.recv().await.unwrap();
+        assert_eq!(received.content, "welcome");
+    }
+
+    #[tokio::test]
+    async fn register_existing_agent_returns_new_subscription() {
+        let names = vec!["alice".into()];
+        let bus = MessageBus::new(&names);
+
+        // Register an already-known agent — should return a new subscription
+        let _rx = bus.register_agent("alice").unwrap();
+        // Original subscribe still works too
+        assert!(bus.subscribe("alice").is_some());
     }
 
     #[tokio::test]

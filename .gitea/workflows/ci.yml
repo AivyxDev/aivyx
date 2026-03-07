@@ -27,14 +27,17 @@ jobs:
 
       - name: Build, test, lint
         run: |
-          # Start SSH agent and add the runner's key for git deps
-          eval "$(ssh-agent -s)"
-          ssh-add /home/aivyx/.ssh/id_ed25519 2>/dev/null || true
-          ssh-keyscan -p 2222 aivyx-gitea.cloud >> /home/aivyx/.ssh/known_hosts 2>/dev/null || true
+          # Prepare SSH files for Docker with correct root permissions
+          TMPDIR=$(mktemp -d)
+          ssh-keyscan -p 2222 aivyx-gitea.cloud > "$TMPDIR/known_hosts" 2>/dev/null || true
+          cp /home/aivyx/.ssh/id_ed25519 "$TMPDIR/id_ed25519"
+          chmod 600 "$TMPDIR/id_ed25519"
+          chmod 644 "$TMPDIR/known_hosts"
 
           docker run --rm \
             -v "$PWD":/build \
-            -v /home/aivyx/.ssh:/root/.ssh:ro \
+            -v "$TMPDIR/id_ed25519":/root/.ssh/id_ed25519:ro \
+            -v "$TMPDIR/known_hosts":/root/.ssh/known_hosts:ro \
             -e CARGO_NET_GIT_FETCH_WITH_CLI=true \
             -w /build \
             rust:1.93-bookworm \
@@ -63,6 +66,8 @@ jobs:
 
               echo "✓ All checks passed"
             '
+
+          rm -rf "$TMPDIR"
 
   # ─── Build Docker Images (main only) ──────────────────────────────
   build:

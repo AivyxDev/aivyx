@@ -16,6 +16,7 @@ use crate::delegation::{
 use crate::job_tracker::JobTracker;
 use crate::message_bus::MessageBus;
 use crate::message_tools::{ReadMessagesTool, SendMessageTool};
+use crate::spawn::SpawnSpecialistTool;
 use crate::suggest::{SuggestSpecialistTool, build_member_profiles};
 use crate::synthesize::SynthesizeResultsTool;
 use crate::verify::VerifyOutputTool;
@@ -246,6 +247,16 @@ impl TeamRuntime {
             lead_agent.register_tool(Box::new(crate::message_tools::RequestPeerReviewTool::new(
                 Arc::clone(&bus),
                 lead.clone(),
+            )));
+        }
+
+        // Register dynamic specialist spawning tool
+        if self.config.dialogue.max_spawned_specialists > 0 {
+            lead_agent.register_tool(Box::new(SpawnSpecialistTool::new(
+                Arc::clone(&self.session),
+                pool,
+                Arc::clone(&bus),
+                self.config.dialogue.max_spawned_specialists,
             )));
         }
 

@@ -62,6 +62,12 @@ enum ClientMessage {
     Cancel,
     /// Respond to a Leash-tier approval request.
     ApprovalResponse { request_id: String, approved: bool },
+    /// Respond to a task-level approval gate.
+    TaskApprovalResponse {
+        request_id: String,
+        approved: bool,
+        reason: Option<String>,
+    },
     /// Keepalive ping.
     Ping,
 }
@@ -95,6 +101,14 @@ enum ServerMessage {
         tool: String,
         input: String,
         request_id: String,
+    },
+    /// Task-level approval gate request.
+    TaskApprovalRequest {
+        task_id: String,
+        step_index: usize,
+        context: String,
+        request_id: String,
+        timeout_secs: Option<u64>,
     },
     /// Keepalive pong.
     Pong,

@@ -48,6 +48,21 @@ pub enum ProgressEvent {
         from_step: usize,
         timestamp: DateTime<Utc>,
     },
+    /// An approval gate was reached and is waiting for user input.
+    ApprovalRequested {
+        task_id: TaskId,
+        step_index: usize,
+        context: String,
+        timeout_secs: Option<u64>,
+        timestamp: DateTime<Utc>,
+    },
+    /// An approval gate received a response.
+    ApprovalReceived {
+        task_id: TaskId,
+        step_index: usize,
+        approved: bool,
+        timestamp: DateTime<Utc>,
+    },
 }
 
 #[cfg(test)]
