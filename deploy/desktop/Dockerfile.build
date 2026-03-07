@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y \
     librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
     # AppImage
     file patchelf \
+    # SSH for private git deps
+    openssh-client \
     # Misc
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
@@ -36,6 +38,16 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
+
+# ── SSH setup for private Git dependencies ──────────────────────────
+# The SSH key is passed in at build time from the CI runner
+ARG SSH_PRIVATE_KEY=""
+RUN mkdir -p /root/.ssh && \
+    ssh-keyscan -p 2222 aivyx-gitea.cloud >> /root/.ssh/known_hosts 2>/dev/null && \
+    if [ -n "$SSH_PRIVATE_KEY" ]; then \
+      echo "$SSH_PRIVATE_KEY" > /root/.ssh/id_ed25519 && \
+      chmod 600 /root/.ssh/id_ed25519; \
+    fi
 
 # ── Copy source ─────────────────────────────────────────────────────
 WORKDIR /build
