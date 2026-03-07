@@ -1,0 +1,81 @@
+# ─── Aivyx Desktop App Build Container ──────────────────────────────
+# Produces portable Linux binaries with standard glibc linker paths.
+#
+# Usage (from repo root):
+#   docker build -t aivyx-builder -f deploy/desktop/Dockerfile.build .
+#   docker run --rm -v $(pwd)/dist:/out aivyx-builder
+#
+# Output in ./dist/:
+#   aivyx-desktop.deb
+#   aivyx-desktop.AppImage (if linuxdeploy available)
+#   aivyx-linux-x86_64.tar.gz + .sha256
+
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ── System dependencies ─────────────────────────────────────────────
+RUN apt-get update && apt-get install -y \
+    curl git build-essential pkg-config \
+    libssl-dev libsqlite3-dev \
+    # Tauri / WebKitGTK dependencies
+    libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+    librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+    # AppImage
+    file patchelf \
+    # Misc
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Rust toolchain ──────────────────────────────────────────────────
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ── Node.js 22 ──────────────────────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# ── Copy source ─────────────────────────────────────────────────────
+WORKDIR /build
+COPY . .
+
+# ── Build engine binary ─────────────────────────────────────────────
+RUN cargo build --release -p aivyx-cli
+
+# ── Prepare sidecar ─────────────────────────────────────────────────
+RUN TARGET=$(rustc -vV | grep host | cut -d' ' -f2) && \
+    mkdir -p apps/desktop/src-tauri/binaries && \
+    cp target/release/aivyx "apps/desktop/src-tauri/binaries/aivyx-${TARGET}" && \
+    chmod +x "apps/desktop/src-tauri/binaries/aivyx-${TARGET}"
+
+# ── Build frontend ──────────────────────────────────────────────────
+WORKDIR /build/apps/desktop
+RUN npm ci
+
+# ── Build Tauri desktop app ─────────────────────────────────────────
+RUN npx tauri build 2>&1 || true
+
+# ── Collect artifacts ───────────────────────────────────────────────
+RUN mkdir -p /artifacts && \
+    # .deb
+    find src-tauri/target/release/bundle/deb -name "*.deb" \
+    -exec cp {} /artifacts/aivyx-desktop.deb \; 2>/dev/null || true && \
+    # AppImage
+    find src-tauri/target/release/bundle/appimage -name "*.AppImage" \
+    -exec cp {} /artifacts/aivyx-desktop.AppImage \; 2>/dev/null || true && \
+    # CLI tarball
+    cd /build && \
+    cp target/release/aivyx /artifacts/aivyx && \
+    cd /artifacts && \
+    tar czf aivyx-linux-x86_64.tar.gz aivyx && \
+    sha256sum aivyx-linux-x86_64.tar.gz | awk '{print $1}' > aivyx-linux-x86_64.tar.gz.sha256 && \
+    # Standalone desktop binary
+    cp /build/apps/desktop/src-tauri/target/release/aivyx-desktop /artifacts/aivyx-desktop-linux-x86_64 2>/dev/null || true && \
+    rm -f /artifacts/aivyx && \
+    ls -lh /artifacts/
+
+# ── Output stage ────────────────────────────────────────────────────
+FROM scratch
+COPY --from=builder /artifacts/ /

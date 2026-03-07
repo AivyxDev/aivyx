@@ -1,0 +1,141 @@
+# ── Aivyx Release Pipeline ─────────────────────────────────────────
+#
+# Triggered on version tags (v*). Builds portable Linux packages
+# using an Ubuntu 22.04 Docker container, uploads to website,
+# and deploys updated images.
+#
+# Runner: self-hosted on aivyx-gitea VPS (act_runner)
+# Build: Docker container (deploy/desktop/Dockerfile.build)
+# Deploy: SSH from gitea VPS → engine/website VPSes
+#
+# Usage: git tag v0.2.0-beta && git push origin v0.2.0-beta
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  # ─── 1. Build Portable Linux Packages ─────────────────────────────
+  build:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build portable binaries (Docker)
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "Building ${VERSION}..."
+          docker build \
+            --no-cache \
+            -t aivyx-builder:${VERSION} \
+            -f deploy/desktop/Dockerfile.build \
+            .
+
+      - name: Extract artifacts
+        run: |
+          VERSION="${{ github.ref_name }}"
+          mkdir -p artifacts
+
+          # Extract from Docker image
+          docker rm -f aivyx-extract 2>/dev/null || true
+          docker create --name aivyx-extract aivyx-builder:${VERSION} true
+          docker export aivyx-extract | tar -C artifacts -xf - 2>/dev/null || true
+          docker rm aivyx-extract
+
+          echo "=== Build artifacts ==="
+          ls -lh artifacts/*.deb artifacts/*.AppImage artifacts/*.tar.gz artifacts/*.sha256 artifacts/aivyx-desktop-linux-x86_64 2>/dev/null
+          echo "✓ Artifacts extracted"
+
+      - name: Verify binaries are portable
+        run: |
+          # Ensure the binary uses standard glibc, not Nix store paths
+          file artifacts/aivyx-desktop-linux-x86_64 || true
+          tar xzf artifacts/aivyx-linux-x86_64.tar.gz -C /tmp/
+          file /tmp/aivyx
+          INTERP=$(readelf -l /tmp/aivyx 2>/dev/null | grep 'interpreter' || echo 'static')
+          echo "Interpreter: ${INTERP}"
+          if echo "${INTERP}" | grep -q 'nix/store'; then
+            echo "ERROR: Binary has Nix store linker path!"
+            exit 1
+          fi
+          echo "✓ Binary is portable"
+          rm -f /tmp/aivyx
+
+  # ─── 2. Deploy Artifacts to Website ───────────────────────────────
+  deploy-releases:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Upload to website VPS
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Create versioned + latest directories
+          ssh -o ConnectTimeout=10 aivyx-studio \
+            "mkdir -p /home/aivyx/releases/${VERSION} /home/aivyx/releases/latest"
+
+          # Upload each artifact
+          for f in artifacts/aivyx-desktop.AppImage \
+                   artifacts/aivyx-desktop.deb \
+                   artifacts/aivyx-desktop-linux-x86_64 \
+                   artifacts/aivyx-linux-x86_64.tar.gz \
+                   artifacts/aivyx-linux-x86_64.tar.gz.sha256; do
+            if [ -f "$f" ]; then
+              echo "Uploading $(basename $f)..."
+              scp -o ConnectTimeout=10 "$f" aivyx-studio:/home/aivyx/releases/${VERSION}/
+              scp -o ConnectTimeout=10 "$f" aivyx-studio:/home/aivyx/releases/latest/
+            fi
+          done
+
+          echo "✓ Artifacts uploaded to releases/${VERSION} and releases/latest"
+
+  # ─── 3. Deploy Engine to VPS ──────────────────────────────────────
+  deploy-engine:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Update engine binary
+        run: |
+          cd artifacts
+          tar xzf aivyx-linux-x86_64.tar.gz
+
+          echo "Deploying engine binary..."
+          scp -o ConnectTimeout=10 aivyx aivyx-engine:/home/aivyx/aivyx-new
+          ssh -o ConnectTimeout=10 aivyx-engine \
+            "chmod +x /home/aivyx/aivyx-new && mv /home/aivyx/aivyx-new /home/aivyx/aivyx"
+
+          echo "✓ Engine VPS updated"
+
+  # ─── 4. Rebuild & Deploy Website ──────────────────────────────────
+  deploy-website:
+    needs: deploy-releases
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild website Docker image
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Build website image
+          docker build \
+            -t aivyx-gitea.cloud/aivyxdev/aivyx-website:${VERSION} \
+            -t aivyx-gitea.cloud/aivyxdev/aivyx-website:latest \
+            -f deploy/website/Dockerfile \
+            .
+
+      - name: Deploy website
+        run: |
+          # Copy the image to the website VPS
+          docker save aivyx-gitea.cloud/aivyxdev/aivyx-website:latest | \
+            ssh -o ConnectTimeout=10 aivyx-studio "docker load"
+
+          # Restart the website container
+          ssh -o ConnectTimeout=10 aivyx-studio \
+            "cd /home/aivyx && docker compose up -d website"
+
+          echo "✓ Website deployed"

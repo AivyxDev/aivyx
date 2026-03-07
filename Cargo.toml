@@ -1,0 +1,93 @@
+[workspace]
+members = [
+    "crates/aivyx-engine-cli",
+    "crates/aivyx-server",
+    "crates/aivyx-task",
+    "crates/aivyx-team",
+    "crates/aivyx-integration-tests",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "Proprietary"
+
+[workspace.dependencies]
+# ─── aivyx-core crates (from git) ────────────────────────────────
+aivyx-core = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-crypto = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-config = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-audit = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-capability = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-llm = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-mcp = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-memory = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-agent = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+aivyx-federation = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git", branch = "main" }
+
+# ─── Local engine crates ─────────────────────────────────────────
+aivyx-server = { path = "crates/aivyx-server" }
+aivyx-task = { path = "crates/aivyx-task" }
+aivyx-team = { path = "crates/aivyx-team" }
+
+# ─── External dependencies ───────────────────────────────────────
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+
+# IDs & errors
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+
+# Crypto
+secrecy = { version = "0.10", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2"
+base64 = "0.22"
+rand = "0.8"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "set-header"] }
+tokio-stream = "0.1"
+tokio-util = "0.7"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Cron scheduling
+croner = "2"
+
+# Rate limiting
+governor = "0.8"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+dialoguer = { version = "0.11", features = ["password"] }
+rpassword = "7"
+dirs = "6"
+
+# Testing
+proptest = "1"
+
+# Archiving
+tar = "0.4"
+flate2 = "1"
+
+# Crypto (engine CLI)
+zeroize = { version = "1", features = ["derive"] }

@@ -1,0 +1,112 @@
+# ── CI Pipeline ───────────────────────────────────────────────────────
+# Runs on every push to main and on pull requests.
+# Uses the self-hosted runner on the Gitea VPS.
+#
+# The "check" job runs cargo build/test/clippy/fmt inside a Docker
+# container because the bare VPS doesn't have gcc/libssl-dev.
+#
+# Jobs:
+#   1. check  — cargo build, test, clippy, fmt (in Docker)
+#   2. build  — Docker images for engine + website (main only)
+#   3. deploy — Pull + restart containers on prod VPSes (main only)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Lint & Test (in Docker) ──────────────────────────────────────
+  check:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build, test, lint
+        run: |
+          docker run --rm \
+            -v "$PWD":/build \
+            -w /build \
+            rust:1.93-bookworm \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq && apt-get install -y -qq \
+                pkg-config libssl-dev libsqlite3-dev > /dev/null 2>&1
+
+              echo "=== Build ==="
+              cargo build --workspace
+
+              echo "=== Test ==="
+              cargo test --workspace
+
+              echo "=== Clippy ==="
+              rustup component add clippy 2>/dev/null
+              cargo clippy --workspace -- -D warnings
+
+              echo "=== Format ==="
+              rustup component add rustfmt 2>/dev/null
+              cargo fmt --all -- --check
+
+              echo "✓ All checks passed"
+            '
+
+  # ─── Build Docker Images (main only) ──────────────────────────────
+  build:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Engine image
+        run: |
+          docker build --no-cache \
+            -f deploy/engine/Dockerfile \
+            -t aivyx-gitea.cloud/aivyxdev/aivyx-engine:latest \
+            .
+          echo "✓ Engine image built"
+
+      - name: Build Website image
+        run: |
+          docker build \
+            -f deploy/website/Dockerfile \
+            -t aivyx-gitea.cloud/aivyxdev/aivyx-website:latest \
+            .
+          echo "✓ Website image built"
+
+  # ─── Deploy to Production (main only) ─────────────────────────────
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - name: Deploy Engine
+        run: |
+          docker save aivyx-gitea.cloud/aivyxdev/aivyx-engine:latest | \
+            ssh -o ConnectTimeout=10 aivyx-engine "docker load"
+
+          ssh -o ConnectTimeout=10 aivyx-engine '
+            cd /home/aivyx
+            docker compose up -d engine
+            sleep 10
+            echo "=== Engine Status ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "engine|NAMES"
+          '
+          echo "✓ Engine deployed"
+
+      - name: Deploy Website
+        run: |
+          docker save aivyx-gitea.cloud/aivyxdev/aivyx-website:latest | \
+            ssh -o ConnectTimeout=10 aivyx-studio "docker load"
+
+          ssh -o ConnectTimeout=10 aivyx-studio '
+            cd /home/aivyx
+            docker compose up -d website
+            sleep 10
+            echo "=== Website Status ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "website|NAMES"
+          '
+          echo "✓ Website deployed"

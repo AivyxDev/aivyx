@@ -1,0 +1,24 @@
+[package]
+name = "aivyx-task"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Multi-step task orchestration engine for the aivyx agent framework"
+
+[dependencies]
+aivyx-core = { workspace = true }
+aivyx-crypto = { workspace = true }
+aivyx-agent = { workspace = true }
+aivyx-audit = { workspace = true }
+aivyx-config = { workspace = true }
+aivyx-llm = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

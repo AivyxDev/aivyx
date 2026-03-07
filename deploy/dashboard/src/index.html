@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aivyx Ops Dashboard — Monitor and communicate with autonomous agents">
+    <title>Aivyx Ops Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ═══ Header ═══ -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">🕯️</span>
+                <h1>Aivyx <span class="accent">Ops</span></h1>
+            </div>
+            <div class="health-badge" id="health-badge">
+                <span class="health-dot"></span>
+                <span class="health-text">Connecting...</span>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="stat-pills" id="stat-pills"></div>
+        </div>
+        <div class="header-right">
+            <div class="clock" id="clock"></div>
+            <button class="btn btn-ghost" id="refresh-btn" title="Refresh all data">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══ Main Grid ═══ -->
+    <main class="dashboard">
+        <!-- Left Column: Schedules -->
+        <section class="panel schedules-panel" id="schedules-panel">
+            <div class="panel-header">
+                <h2>📋 Schedules</h2>
+                <div class="panel-actions">
+                    <span class="badge" id="schedule-count">0</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="schedule-filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="business-admin">
+                        <span class="agent-dot agent-biz"></span> Business Admin
+                    </button>
+                    <button class="filter-btn" data-filter="devops">
+                        <span class="agent-dot agent-ops"></span> DevOps
+                    </button>
+                </div>
+                <div class="schedule-list" id="schedule-list">
+                    <div class="loading-skeleton"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Center Column: Notification Feed -->
+        <section class="panel feed-panel" id="feed-panel">
+            <div class="panel-header">
+                <h2>📡 Agent Feed</h2>
+                <div class="panel-actions">
+                    <div class="feed-tabs">
+                        <button class="tab-btn active" id="tab-pending" data-tab="pending">Pending</button>
+                        <button class="tab-btn" id="tab-history" data-tab="history">History</button>
+                    </div>
+                    <button class="btn btn-sm btn-ghost" id="clear-feed-btn" title="Clear notifications">Clear</button>
+                    <span class="badge" id="notification-count">0</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="feed-list" id="feed-list">
+                    <div class="feed-empty">
+                        <p>Waiting for agent outputs...</p>
+                        <p class="muted">Notifications will appear here as schedules fire.</p>
+                    </div>
+                </div>
+                <div class="feed-list feed-history" id="feed-history" style="display:none">
+                    <div class="feed-empty">
+                        <p>No rated notifications yet.</p>
+                        <p class="muted">Rate outputs using 👍 ⚖️ 👎 to build feedback history.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Agent Cards + Metrics -->
+        <section class="sidebar">
+            <!-- Agent Cards -->
+            <div class="panel agents-panel" id="agents-panel">
+                <div class="panel-header">
+                    <h2>🤖 Agents</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="agent-cards" id="agent-cards">
+                        <div class="loading-skeleton"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="panel metrics-panel" id="metrics-panel">
+                <div class="panel-header">
+                    <h2>📊 Metrics</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="metrics-grid" id="metrics-grid">
+                        <div class="loading-skeleton"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ Chat Drawer ═══ -->
+    <div class="chat-drawer" id="chat-drawer">
+        <div class="chat-toggle" id="chat-toggle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <span>Chat</span>
+        </div>
+        <div class="chat-container" id="chat-container">
+            <div class="chat-header">
+                <select class="chat-agent-select" id="chat-agent-select">
+                    <option value="business-admin">🏢 Business Admin</option>
+                    <option value="devops">⚙️ DevOps</option>
+                </select>
+                <button class="btn btn-sm btn-ghost" id="chat-close">✕</button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-welcome">
+                    <p>Send a message to interact with an agent directly.</p>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <textarea class="chat-input" id="chat-input" placeholder="Type a message..." rows="1"></textarea>
+                <button class="btn btn-primary chat-send" id="chat-send">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

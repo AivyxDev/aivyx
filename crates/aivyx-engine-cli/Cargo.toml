@@ -1,0 +1,42 @@
+[package]
+name = "aivyx-engine-cli"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "aivyx"
+path = "src/main.rs"
+
+[dependencies]
+aivyx-core = { workspace = true }
+aivyx-crypto = { workspace = true }
+aivyx-audit = { workspace = true }
+aivyx-config = { workspace = true }
+aivyx-llm = { workspace = true }
+aivyx-agent = { workspace = true }
+aivyx-memory = { workspace = true }
+aivyx-mcp = { workspace = true }
+aivyx-task = { workspace = true }
+aivyx-team = { workspace = true }
+aivyx-server = { workspace = true }
+axum = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+dialoguer = { workspace = true }
+rpassword = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+croner = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
+zeroize = { workspace = true }
+tempfile = "3"

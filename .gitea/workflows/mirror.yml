@@ -1,0 +1,32 @@
+# ── GitHub Mirror Sync ───────────────────────────────────────────────
+# Pushes the canonical Gitea repo to the GitHub read-only mirror.
+#
+# Requires: GITHUB_MIRROR_TOKEN secret with push access to AivyxDev/aivyx
+#
+# To set up:
+#   1. Create a GitHub fine-grained PAT with "Contents: Read and write" on AivyxDev/aivyx
+#   2. Add it as a Gitea secret: GITHUB_MIRROR_TOKEN
+#
+name: Mirror to GitHub
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  mirror:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitHub mirror
+        run: |
+          git remote add github https://x-access-token:${{ secrets.GH_MIRROR_TOKEN }}@github.com/AivyxDev/aivyx.git || true
+          git push github main --force
+          git push github --tags --force
+        env:
+          GH_MIRROR_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}

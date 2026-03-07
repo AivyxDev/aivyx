@@ -1,0 +1,47 @@
+[package]
+name = "aivyx-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[features]
+default = ["telegram"]
+telegram = []
+
+[dependencies]
+aivyx-core = { workspace = true }
+aivyx-crypto = { workspace = true }
+aivyx-capability = { workspace = true }
+aivyx-audit = { workspace = true }
+aivyx-config = { workspace = true }
+aivyx-llm = { workspace = true }
+aivyx-agent = { workspace = true, features = ["federation"] }
+aivyx-memory = { workspace = true }
+aivyx-task = { workspace = true }
+aivyx-team = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+subtle = { workspace = true }
+croner = { workspace = true }
+base64 = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+tokio-util = { workspace = true }
+governor = { workspace = true }
+aivyx-federation = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+http-body-util = "0.1"
+rand = { workspace = true }

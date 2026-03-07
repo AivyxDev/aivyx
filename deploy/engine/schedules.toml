@@ -1,0 +1,82 @@
+# ─── Autonomous Agent Schedule Reference ───────────────────────────
+#
+# This file documents all scheduled missions for the autonomous agents
+# deployed on VPS5. These are added to the engine via `aivyx schedule add`.
+#
+# Format: aivyx schedule add --name NAME --cron "EXPR" --agent AGENT --prompt "PROMPT"
+#
+# ─────────────────────────────────────────────────────────────────────
+
+# ── Business Admin Agent ─────────────────────────────────────────────
+
+# Morning business digest — 7:00 AM daily
+# aivyx schedule add \
+#   --name biz-morning-digest \
+#   --cron "0 7 * * *" \
+#   --agent business-admin \
+#   --prompt "Generate a concise morning digest. Check for any notable news or updates relevant to the Aivyx project. Summarize any system notifications from the past 24 hours. Be brief and actionable."
+
+# Midday project status — 12:00 PM weekdays
+# aivyx schedule add \
+#   --name biz-project-status \
+#   --cron "0 12 * * 1-5" \
+#   --agent business-admin \
+#   --prompt "Check the current status of active projects. Review recent git activity across repositories. Summarize progress, blockers, and upcoming deadlines. Keep it under 500 words."
+
+# End-of-day summary — 6:00 PM weekdays
+# aivyx schedule add \
+#   --name biz-eod-summary \
+#   --cron "0 18 * * 1-5" \
+#   --agent business-admin \
+#   --prompt "Generate an end-of-day summary. What was accomplished today? What needs attention tomorrow? List any outstanding action items. Be concise."
+
+# Weekly review — Monday 9:00 AM
+# aivyx schedule add \
+#   --name biz-weekly-review \
+#   --cron "0 9 * * 1" \
+#   --agent business-admin \
+#   --prompt "Generate a weekly business review. Summarize the past week's activity, key metrics, and any trends. Identify priorities for the coming week. Include any infrastructure or DevOps highlights from the ops agent notifications."
+
+# ── DevOps Agent ─────────────────────────────────────────────────────
+
+# Health check — every 30 minutes
+# aivyx schedule add \
+#   --name ops-health-check \
+#   --cron "*/30 * * * *" \
+#   --agent devops \
+#   --prompt "Run a quick server health check. Check: disk usage (df -h), memory (free -h), CPU load (uptime), and Docker container status (docker ps --format 'table {{.Names}}\t{{.Status}}'). Report any anomalies. If everything is normal, respond with a one-line OK status."
+
+# Docker container status — every 4 hours
+# aivyx schedule add \
+#   --name ops-docker-status \
+#   --cron "0 */4 * * *" \
+#   --agent devops \
+#   --prompt "Check all Docker containers: their status, restart counts, resource usage, and image versions. Flag any containers that have restarted recently or are unhealthy. Use: docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}'"
+
+# Nightly disk cleanup — 3:00 AM daily
+# aivyx schedule add \
+#   --name ops-disk-cleanup \
+#   --cron "0 3 * * *" \
+#   --agent devops \
+#   --prompt "Perform routine disk maintenance. Check for: large log files (find /var/log -size +100M), old Docker images (docker image prune --filter 'until=168h' --force), and tmp files older than 7 days. Report what was cleaned and current disk usage."
+
+# SSL certificate check — Monday 9:00 AM
+# aivyx schedule add \
+#   --name ops-ssl-check \
+#   --cron "0 9 * * 1" \
+#   --agent devops \
+#   --prompt "Check SSL certificate expiry for all configured domains. Use: echo | openssl s_client -connect DOMAIN:443 -servername DOMAIN 2>/dev/null | openssl x509 -noout -dates. Flag any certificates expiring within 30 days."
+
+# CI pipeline status — every 2 hours
+# aivyx schedule add \
+#   --name ops-ci-status \
+#   --cron "0 */2 * * *" \
+#   --agent devops \
+#   --prompt "Check the CI/CD pipeline status. Look at recent workflow runs and report any failures. Check if the latest builds are passing. If there are failures, summarize the error."
+
+# Weekly backup verification — Sunday 4:00 AM
+# aivyx schedule add \
+#   --name ops-backup-verify \
+#   --cron "0 4 * * 0" \
+#   --agent devops \
+#   --prompt "Verify backup integrity. Check that recent backups exist, are non-zero size, and are recent (within expected schedule). List backup files with sizes and dates. Flag any missing or suspicious backups."

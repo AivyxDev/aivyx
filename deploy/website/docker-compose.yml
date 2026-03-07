@@ -1,0 +1,73 @@
+services:
+  # ─── Traefik Reverse Proxy & Auto-TLS ─────────────────────────────
+  traefik:
+    image: traefik:v3.6
+    container_name: aivyx-traefik
+    restart: always
+    command:
+      - "--log.level=INFO"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL:?Set ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--ping=true"
+      - "--entrypoints.ping.address=:8082"
+      - "--ping.entrypoint=ping"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8082/ping || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - aivyx
+
+  # ─── Aivyx Website (Astro → nginx) ───────────────────────────────
+  website:
+    image: aivyx-gitea.cloud/aivyxdev/aivyx-website:latest
+    container_name: aivyx-website
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.website.rule=Host(`${SITE_DOMAIN:?Set SITE_DOMAIN}`) || Host(`www.${SITE_DOMAIN}`)"
+      - "traefik.http.routers.website.entrypoints=websecure"
+      - "traefik.http.routers.website.tls.certresolver=le"
+      - "traefik.http.services.website.loadbalancer.server.port=80"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost/ > /dev/null || exit 1" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *logging
+    networks:
+      - aivyx
+
+volumes:
+  letsencrypt:
+
+
+networks:
+  aivyx:
+    driver: bridge
