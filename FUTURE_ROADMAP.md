@@ -25,14 +25,15 @@ voice/multimodal**, and **enterprise observability**.
 
 ---
 
-## Phase 1: Foundation Hardening (v0.2.x)
+## Phase 1: Foundation Hardening (v0.2.x) — COMPLETE
 
 > Prerequisite stability before feature expansion.
+> **Status**: Complete. See `docs/PHASE1_IMPLEMENTATION.md` for details.
 
 ### 1.1 CI/CD & Distribution
 
-- [ ] GitHub Actions for aivyx-core (test, clippy, rustfmt)
-- [ ] Gitea Actions for aivyx-engine (test, Docker build, deploy to VPS1)
+- [x] Gitea Actions for aivyx-core (test, clippy, rustfmt)
+- [x] Gitea Actions for aivyx-engine (test, Docker build, deploy to VPS1)
 - [ ] Cross-compiled binary releases (x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin)
 - [ ] Tauri desktop app builds in CI (Linux AppImage, macOS DMG, Windows MSI)
 
@@ -41,62 +42,61 @@ voice/multimodal**, and **enterprise observability**.
 **Trend**: Enterprise adoption is infrastructure-gated. Compliance teams require
 structured telemetry before approving agent deployments.
 
-- [ ] **OpenTelemetry integration** — instrument LLM calls, tool invocations, and
+- [x] **OpenTelemetry integration** — instrument LLM calls, tool invocations, and
       agent turns with OTEL-compatible spans
-- [ ] **Prometheus metrics endpoint** (`GET /metrics`) — request rates, latencies,
+- [x] **Prometheus metrics endpoint** (`GET /metrics`) — request rates, latencies,
       token usage, error rates, rate limit hits per tier
-- [ ] **Structured logging** — migrate from `tracing` plain text to JSON-structured
+- [x] **Structured logging** — migrate from `tracing` plain text to JSON-structured
       log output with correlation IDs per request
-- [ ] **Cost dashboard** — per-agent, per-team, per-session cost breakdown via
+- [x] **Cost dashboard** — per-agent, per-team, per-session cost breakdown via
       `CostTracker` aggregation (already tracks per-turn; needs rollup)
 
 ### 1.3 Performance Profiling
 
-- [ ] Benchmark suite for core hot paths (agent turn loop, encryption, vector search)
-- [ ] Connection pooling audit — ensure `reqwest` clients are reused across LLM calls
+- [x] Benchmark suite for core hot paths (agent turn loop, encryption, vector search)
+- [x] Connection pooling audit — ensure `reqwest` clients are reused across LLM calls
 - [ ] Memory profiling for long-running team sessions (broadcast channel growth)
 
 ---
 
-## Phase 2: Orchestration Evolution (v0.3.x)
+## Phase 2: Orchestration Evolution (v0.3.x) — COMPLETE
 
 > Transform sequential task execution into a proper DAG-based workflow engine.
+> **Status**: Complete. See `docs/PHASE2_IMPLEMENTATION.md` for details.
 
 ### 2.1 DAG Task Execution
 
 **Trend**: All leading frameworks (LangGraph, AutoGen v0.4, CrewAI Flows) have
 moved to graph-based execution. Sequential-only planning is a competitive gap.
 
-Current state: `Mission` has flat `Vec<Step>` with sequential execution.
+Architecture implemented:
 
-Proposed architecture:
-
-```
-Mission {
-    steps: Vec<Step>,
-    edges: Vec<(usize, usize)>,   // directed dependency edges
-    parallelism: u32,              // max concurrent steps
+```rust
+pub struct Step {
+    // ... existing fields ...
+    pub depends_on: Vec<usize>,  // DAG edges via serde(default)
+    pub kind: StepKind,          // Execute | Reflect | Approval
 }
 ```
 
-- [ ] **Step dependency graph** — `depends_on: Vec<usize>` field on `Step`,
-      with topological sort for execution ordering
-- [ ] **Parallel step execution** — `tokio::JoinSet` to run independent steps
-      concurrently (bounded by `parallelism`)
-- [ ] **DAG-aware planner prompt** — update the planner system prompt to output
-      dependencies between steps (JSON: `{description, tool_hints, depends_on}`)
+- [x] **Step dependency graph** — `depends_on: Vec<usize>` field on `Step`,
+      with topological sort for execution ordering (`dag.rs`)
+- [x] **Parallel step execution** — `tokio::JoinSet` to run independent steps
+      concurrently (wavefront execution in `execute_dag()`)
+- [x] **DAG-aware planner prompt** — `DAG_PLANNING_SYSTEM_PROMPT` and `plan_mission_dag()`
+      output dependencies between steps
 - [ ] **Step result forwarding** — completed step results available as context
       to dependent steps via `{step_N_result}` template variables
-- [ ] **Partial failure handling** — skip downstream steps when a dependency fails,
-      mark as `Skipped { reason: "dependency failed" }`
+- [x] **Partial failure handling** — `dag::skip_downstream()` marks all transitive
+      dependents as `Skipped` when a dependency fails
 
 ### 2.2 Dynamic Agent Spawning
 
 **Trend**: Static team composition is giving way to dynamic specialist creation.
 AutoGen v0.4 and OpenAI Swarm both support on-the-fly agent instantiation.
 
-- [ ] **`SpawnSpecialistTool`** — allow the Coordinator to create a new agent
-      mid-session with a custom system prompt, tool set, and capability scope
+- [x] **`SpawnSpecialistTool`** — allows the lead agent to create a new specialist
+      mid-session with a custom role and profile, registered in pool and message bus
 - [ ] **Ephemeral agents** — spawned specialists auto-terminate after completing
       their delegated task; state not persisted unless promoted
 - [ ] **Role templates** — extend beyond the 9 Nonagon roles with user-defined
@@ -107,28 +107,25 @@ AutoGen v0.4 and OpenAI Swarm both support on-the-fly agent instantiation.
 **Trend**: Reflection (generate-critique-refine) is becoming a standard
 orchestration primitive. LangGraph's Reflection pattern and Self-RAG both use it.
 
-- [ ] **Reflection step type** — new `StepKind::Reflect` that sends the previous
-      step's output back to the agent with a critic prompt
-- [ ] **Quality gate** — configurable pass/fail criteria for reflection steps
-      (e.g., "does the output contain code?" or LLM-as-judge evaluation)
-- [ ] **Max reflection depth** — prevent infinite reflection loops (default: 2)
+- [x] **Reflection step type** — `StepKind::Reflect` with `build_reflection_prompt()`
+      and `parse_reflection_result()`, dynamic step insertion on rejection
+- [x] **Quality gate** — LLM-as-judge evaluation via reflection verdict
+      (`ReflectionVerdict { accept, feedback }`)
+- [x] **Max reflection depth** — `current_depth` counter prevents infinite loops (default max: 2)
 
 ### 2.4 Human-in-the-Loop Workflows
 
 **Trend**: Enterprise agents require approval gates. LangGraph's interrupt/resume
 and A2A's `input-required` task state address this.
 
-Current state: `AutonomyTier::Leash` exists in aivyx-core but server-side
-approval flows are not implemented.
-
-- [ ] **Approval checkpoints** — new `StepKind::Approval` that pauses execution
-      and emits a `ProgressEvent::ApprovalRequired { step_index, context }`
-- [ ] **WebSocket approval flow** — extend WS protocol to push approval requests
-      and receive approve/deny responses
-- [ ] **Timeout-based escalation** — configurable auto-deny after N minutes,
-      or auto-approve for trusted teams
-- [ ] **Audit integration** — all approval decisions logged as `AuditEvent` with
-      principal attribution
+- [x] **Approval checkpoints** — `StepKind::Approval` with `execute_approval_step()`,
+      emits `ProgressEvent::ApprovalRequested`
+- [x] **WebSocket approval flow** — `TaskApprovalRequest`/`TaskApprovalResponse`
+      protocol messages added to WS handler
+- [x] **Timeout-based escalation** — configurable `auto_approve_on_timeout` flag
+      with `timeout_secs` parameter
+- [x] **Audit integration** — `TaskApprovalRequested`/`TaskApprovalResolved` audit
+      events with `method` field ("user", "timeout_auto", "timeout_reject")
 
 ---
 
@@ -430,12 +427,12 @@ These apply across all phases:
 
 | Capability                  | LangGraph | AutoGen | CrewAI | Aivyx Engine |
 |-----------------------------|-----------|---------|--------|--------------|
-| DAG execution               | Yes       | Yes     | No     | Planned v0.3 |
+| DAG execution               | Yes       | Yes     | No     | Yes (v0.3)   |
 | Streaming                   | Yes       | Partial | No     | Yes          |
 | Encrypted storage           | No        | No      | No     | Yes          |
 | Capability-based security   | No        | No      | No     | Yes          |
 | Tamper-proof audit          | No        | No      | No     | Yes          |
-| Human-in-the-loop           | Yes       | Yes     | No     | Planned v0.3 |
+| Human-in-the-loop           | Yes       | Yes     | No     | Yes (v0.3)   |
 | MCP support                 | Partial   | No      | No     | Yes          |
 | A2A support                 | No        | No      | No     | Planned v0.4 |
 | Multi-agent teams           | Yes       | Yes     | Yes    | Yes (Nonagon)|

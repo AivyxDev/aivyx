@@ -23,7 +23,7 @@ use crate::store::{TaskMetadata, TaskStore};
 
 /// Convenience alias for the progress sink trait parameterized to task events.
 type DynProgressSink = dyn aivyx_core::ProgressSink<ProgressEvent>;
-use crate::types::{ExecutionMode, Mission, StepKind, StepStatus, TaskStatus};
+use crate::types::{ExecutionMode, Mission, Step, StepKind, StepStatus, TaskStatus};
 
 /// Orchestrates multi-step mission execution.
 pub struct TaskEngine {
