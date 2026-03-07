@@ -217,6 +217,30 @@ impl aivyx_core::ProgressSink<ProgressEvent> for CliProgressSink {
                 output::kv("Resuming from step", &format!("{}", from_step + 1));
                 println!();
             }
+            ProgressEvent::ApprovalRequested {
+                step_index,
+                context,
+                ..
+            } => {
+                output::header(&format!(
+                    "Step {} — approval required: {}",
+                    step_index + 1,
+                    context
+                ));
+                println!();
+            }
+            ProgressEvent::ApprovalReceived {
+                step_index,
+                approved,
+                ..
+            } => {
+                if approved {
+                    output::success(&format!("Step {} approved", step_index + 1));
+                } else {
+                    output::error(&format!("Step {} rejected", step_index + 1));
+                }
+                println!();
+            }
         }
         Ok(())
     }

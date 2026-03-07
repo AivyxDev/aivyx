@@ -11,6 +11,8 @@ use aivyx_audit::AuditLog;
 use aivyx_config::{AivyxConfig, AivyxDirs};
 use aivyx_core::Result;
 use aivyx_crypto::{EncryptedStore, MasterKey, derive_audit_key};
+use aivyx_federation::auth::FederationAuth;
+use aivyx_federation::client::FederationClient;
 use sha2::{Digest, Sha256};
 
 use crate::app_state::{AppState, EndpointRateLimiters};
@@ -32,6 +34,11 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/metrics",
             axum::routing::get(routes::metrics::prometheus_metrics),
+        )
+        // A2A Agent Card — public discovery endpoint per Google A2A spec
+        .route(
+            "/.well-known/agent.json",
+            axum::routing::get(routes::a2a::agent_card),
         );
 
     // --- Rate-limited tiers (inside auth layer) ---
@@ -90,6 +97,8 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/tasks/{id}/resume",
             axum::routing::post(routes::tasks::resume_task),
         )
+        // A2A JSON-RPC 2.0 — task operations via Google A2A protocol
+        .route("/a2a", axum::routing::post(routes::a2a::a2a_handler))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::rate_limit::rate_limit_task,
@@ -438,6 +447,9 @@ pub fn build_app_state(
     // Memory manager is optional — requires embedding config
     let memory_manager = build_memory_manager(&dirs, &config, &master_key)?;
 
+    // Build federation client if configured
+    let federation = build_federation_client(&dirs, &config)?;
+
     let agent_dirs = AivyxDirs::new(dirs.root());
     let agent_config = config.clone();
 
@@ -453,7 +465,7 @@ pub fn build_app_state(
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,
         endpoint_rate_limiters: None,
-        federation: None,
+        federation,
         prometheus_handle: None,
     };
 
@@ -499,6 +511,9 @@ pub fn build_app_state_with_keys(
         .install_recorder()
         .ok();
 
+    // Build federation client if configured
+    let federation = build_federation_client(&dirs, &config)?;
+
     let state = AppState {
         agent_session: Arc::new(AgentSession::new(agent_dirs, agent_config, agent_key)),
         session_store,
@@ -511,7 +526,7 @@ pub fn build_app_state_with_keys(
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode,
         endpoint_rate_limiters,
-        federation: None,
+        federation,
         prometheus_handle,
     };
 
@@ -544,6 +559,38 @@ fn build_memory_manager(
     } else {
         Ok(None)
     }
+}
+
+/// Attempt to build a `FederationClient` if federation is configured.
+///
+/// Loads or generates the Ed25519 keypair from the configured path (or
+/// `<data_dir>/federation.key` by default). The client is shared via
+/// `Arc` in `AppState` for all federation route handlers.
+fn build_federation_client(
+    dirs: &AivyxDirs,
+    config: &AivyxConfig,
+) -> Result<Option<Arc<FederationClient>>> {
+    let fed_config = match &config.federation {
+        Some(fc) if fc.enabled => fc.clone(),
+        _ => return Ok(None),
+    };
+
+    let key_path = match &fed_config.private_key_path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => dirs.root().join("federation.key"),
+    };
+
+    let auth = FederationAuth::load_or_generate(fed_config.instance_id.clone(), &key_path)?;
+
+    tracing::info!(
+        instance_id = %fed_config.instance_id,
+        public_key = %auth.public_key_base64(),
+        peers = fed_config.peers.len(),
+        "federation enabled"
+    );
+
+    let client = FederationClient::new(fed_config, auth);
+    Ok(Some(Arc::new(client)))
 }
 
 #[cfg(test)]

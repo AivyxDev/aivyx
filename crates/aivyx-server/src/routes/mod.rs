@@ -1,5 +1,6 @@
 //! HTTP route handlers for the aivyx server.
 
+pub mod a2a;
 pub mod admin;
 pub mod agents;
 pub mod audit;

@@ -1,0 +1,13 @@
+# Local path overrides for development against aivyx-core.
+# Remove or comment out when using published/git versions.
+[patch."ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git"]
+aivyx-core = { path = "../aivyx-core/crates/aivyx-core" }
+aivyx-crypto = { path = "../aivyx-core/crates/aivyx-crypto" }
+aivyx-config = { path = "../aivyx-core/crates/aivyx-config" }
+aivyx-audit = { path = "../aivyx-core/crates/aivyx-audit" }
+aivyx-capability = { path = "../aivyx-core/crates/aivyx-capability" }
+aivyx-llm = { path = "../aivyx-core/crates/aivyx-llm" }
+aivyx-mcp = { path = "../aivyx-core/crates/aivyx-mcp" }
+aivyx-memory = { path = "../aivyx-core/crates/aivyx-memory" }
+aivyx-agent = { path = "../aivyx-core/crates/aivyx-agent" }
+aivyx-federation = { path = "../aivyx-core/crates/aivyx-federation" }

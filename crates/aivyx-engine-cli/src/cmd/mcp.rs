@@ -110,6 +110,7 @@ fn build_config(command: Option<&str>, url: Option<&str>) -> Result<McpServerCon
             name: url.to_string(),
             transport: McpTransport::Sse {
                 url: url.to_string(),
+                auth: None,
             },
             env: HashMap::new(),
             timeout_secs: 30,

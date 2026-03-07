@@ -97,6 +97,9 @@ pub async fn peer_agents(
 }
 
 /// POST /federation/relay/chat — relay a chat message to a peer's agent.
+///
+/// Enforces trust policy: the target peer must have a configured trust policy.
+/// Without a trust policy, relay requests are denied (principle of least privilege).
 pub async fn relay_chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RelayChatRequest>,
@@ -112,6 +115,17 @@ pub async fn relay_chat(
         }
     };
 
+    // Enforce trust policy — peer must have an explicit policy to allow relay
+    if federation.peer_trust_policy(&req.peer_id).await.is_none() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": format!("no trust policy configured for peer '{}'", req.peer_id)
+            })),
+        )
+            .into_response();
+    }
+
     match federation.relay_chat(&req).await {
         Ok(resp) => Json(serde_json::json!(resp)).into_response(),
         Err(e) => (
@@ -123,6 +137,8 @@ pub async fn relay_chat(
 }
 
 /// POST /federation/relay/task — create a task on a peer instance.
+///
+/// Enforces trust policy: the target peer must have a configured trust policy.
 pub async fn relay_task(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RelayTaskRequest>,
@@ -137,6 +153,17 @@ pub async fn relay_task(
                 .into_response();
         }
     };
+
+    // Enforce trust policy — peer must have an explicit policy to allow relay
+    if federation.peer_trust_policy(&req.peer_id).await.is_none() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": format!("no trust policy configured for peer '{}'", req.peer_id)
+            })),
+        )
+            .into_response();
+    }
 
     match federation.relay_task(&req).await {
         Ok(resp) => Json(serde_json::json!(resp)).into_response(),

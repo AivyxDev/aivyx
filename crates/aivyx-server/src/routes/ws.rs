@@ -381,6 +381,19 @@ async fn handle_connection(socket: WebSocket, state: Arc<AppState>) {
                     })
                     .await;
             }
+            ClientMessage::TaskApprovalResponse {
+                request_id,
+                approved,
+                reason: _,
+            } => {
+                // Task approval responses use the same channel as leash approvals
+                let _ = approval_tx
+                    .send(ApprovalAnswer {
+                        request_id,
+                        approved,
+                    })
+                    .await;
+            }
             ClientMessage::Ping => {
                 let _ = outgoing_tx.send(ServerMessage::Pong).await;
             }

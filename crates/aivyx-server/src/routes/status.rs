@@ -29,6 +29,8 @@ pub struct StatusResponse {
     pub audit_entries: usize,
     /// Memory statistics (if available).
     pub memory: Option<MemoryStatusInfo>,
+    /// Federation subsystem status (if enabled).
+    pub federation: Option<FederationStatusInfo>,
 }
 
 /// Memory subsystem status info.
@@ -40,6 +42,31 @@ pub struct MemoryStatusInfo {
     pub total_triples: usize,
     /// Vector index size.
     pub index_size: usize,
+}
+
+/// Federation subsystem status info.
+#[derive(Debug, Serialize)]
+pub struct FederationStatusInfo {
+    /// This instance's federation ID.
+    pub instance_id: String,
+    /// This instance's Ed25519 public key (base64).
+    pub public_key: String,
+    /// Total number of configured peers.
+    pub peer_count: usize,
+    /// Number of healthy (reachable) peers.
+    pub healthy_peers: usize,
+    /// Per-peer health details.
+    pub peers: Vec<PeerHealthInfo>,
+}
+
+/// Health info for a single federation peer.
+#[derive(Debug, Serialize)]
+pub struct PeerHealthInfo {
+    pub id: String,
+    pub url: String,
+    pub healthy: bool,
+    pub last_seen: Option<String>,
+    pub capabilities: Vec<String>,
 }
 
 /// `GET /status` — system summary.
@@ -71,6 +98,29 @@ pub async fn system_status(
         None
     };
 
+    let federation = if let Some(ref fed) = state.federation {
+        let peers = fed.list_peers().await;
+        let healthy_count = peers.iter().filter(|p| p.healthy).count();
+        Some(FederationStatusInfo {
+            instance_id: fed.instance_id().to_string(),
+            public_key: fed.public_key(),
+            peer_count: peers.len(),
+            healthy_peers: healthy_count,
+            peers: peers
+                .into_iter()
+                .map(|p| PeerHealthInfo {
+                    id: p.id,
+                    url: p.url,
+                    healthy: p.healthy,
+                    last_seen: p.last_seen,
+                    capabilities: p.capabilities,
+                })
+                .collect(),
+        })
+    } else {
+        None
+    };
+
     Ok(axum::Json(StatusResponse {
         provider,
         autonomy_tier: tier,
@@ -79,6 +129,7 @@ pub async fn system_status(
         session_count,
         audit_entries,
         memory,
+        federation,
     }))
 }
 
@@ -115,6 +166,7 @@ mod tests {
                 total_triples: 5,
                 index_size: 10,
             }),
+            federation: None,
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["agent_count"], 3);
@@ -131,9 +183,40 @@ mod tests {
             session_count: 0,
             audit_entries: 0,
             memory: None,
+            federation: None,
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert!(json["memory"].is_null());
+    }
+
+    #[test]
+    fn status_with_federation() {
+        let resp = StatusResponse {
+            provider: "claude".into(),
+            autonomy_tier: "Trust".into(),
+            agent_count: 2,
+            team_count: 0,
+            session_count: 0,
+            audit_entries: 0,
+            memory: None,
+            federation: Some(FederationStatusInfo {
+                instance_id: "vps5-ops".into(),
+                public_key: "AAAA".into(),
+                peer_count: 1,
+                healthy_peers: 1,
+                peers: vec![PeerHealthInfo {
+                    id: "vps1-studio".into(),
+                    url: "https://api.studio.io".into(),
+                    healthy: true,
+                    last_seen: Some("2026-03-07T00:00:00Z".into()),
+                    capabilities: vec!["chat".into(), "memory".into()],
+                }],
+            }),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["federation"]["instance_id"], "vps5-ops");
+        assert_eq!(json["federation"]["healthy_peers"], 1);
+        assert_eq!(json["federation"]["peers"][0]["id"], "vps1-studio");
     }
 
     #[test]
