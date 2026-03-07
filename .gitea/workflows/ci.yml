@@ -84,6 +84,7 @@ jobs:
       - name: Build Engine image
         run: |
           docker build --no-cache \
+            --build-arg SSH_KEY="$(cat /home/aivyx/.ssh/id_ed25519)" \
             -f deploy/engine/Dockerfile \
             -t aivyx-gitea.cloud/aivyxdev/aivyx-engine:latest \
             .

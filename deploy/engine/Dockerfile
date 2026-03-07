@@ -2,7 +2,7 @@
 # ─── Stage 1: Build the aivyx binary ────────────────────────────────
 FROM rust:bookworm AS builder
 
-RUN apt-get update && apt-get install -y openssh-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssh-client git && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /root/.ssh && \
     ssh-keyscan -p 2222 aivyx-gitea.cloud >> /root/.ssh/known_hosts 2>/dev/null
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
@@ -13,9 +13,16 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates/ crates/
 
-# Build only the CLI binary (uses BuildKit SSH mount for git deps)
-RUN --mount=type=ssh cargo build --release --package aivyx-engine-cli \
-    && strip target/release/aivyx
+# Clone aivyx-core as sibling for [patch] path dependencies
+ARG SSH_KEY=""
+RUN if [ -n "$SSH_KEY" ]; then \
+    echo "$SSH_KEY" > /root/.ssh/id_ed25519 && \
+    chmod 600 /root/.ssh/id_ed25519; \
+    fi && \
+    git clone --depth 1 ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git /aivyx-core && \
+    cargo build --release --package aivyx-engine-cli && \
+    strip target/release/aivyx && \
+    rm -f /root/.ssh/id_ed25519
 
 # ─── Stage 2: Minimal runtime ──────────────────────────────────────
 FROM debian:bookworm-slim
