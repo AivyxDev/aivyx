@@ -42,6 +42,15 @@ Host vps1 engine.aivyx.ai
     ServerAliveInterval 60
     IdentitiesOnly yes
 
+Host vps2 web.aivyx.ai
+    HostName 72.62.120.196
+    User aivyx
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519_aivyx_deploy
+    StrictHostKeyChecking accept-new
+    ServerAliveInterval 60
+    IdentitiesOnly yes
+
 Host vps5 gitea.aivyx.ai
     HostName 148.230.102.223
     User aivyx
@@ -73,6 +82,9 @@ Host github.com
 # Engine server
 ssh vps1
 
+# Web server (aivyx-studio.com)
+ssh vps2
+
 # Gitea server
 ssh vps5
 
@@ -87,18 +99,39 @@ ssh -T git@github.com
 
 ## VPS Access Map
 
-| Alias | Hostname | IP | Port | User | Key |
-|-------|----------|-----|------|------|-----|
-| `vps1` | engine.aivyx.ai | 72.60.208.87 | 22022 | aivyx | `_deploy` |
-| `vps5` | gitea.aivyx.ai | 148.230.102.223 | 22022 | aivyx | `_deploy` |
+| Alias | Hostname | IP | Port | User | Key | Role |
+|-------|----------|-----|------|------|-----|------|
+| `vps1` | engine.aivyx.ai | 72.60.208.87 | 22022 | aivyx | `_deploy` | Aivyx Engine |
+| `vps2` | web.aivyx.ai | 72.62.120.196 | 22 | aivyx | `_deploy` | Website (aivyx-studio.com) |
+| `vps5` | gitea.aivyx.ai | 148.230.102.223 | 22022 | aivyx | `_deploy` | Gitea + CI |
 
 ### Standby VPS (wiped, fresh Ubuntu 24.04 + Docker)
 
 | Host | IP | Plan | Hostinger ID |
 |------|-----|------|-------------|
-| VPS2 (nexus) | 72.62.120.196 | KVM4 | 1392872 |
 | VPS3 (studio) | 76.13.198.181 | KVM2 | 1405970 |
 | VPS6 (ops) | 148.230.103.191 | KVM4 | 1435936 |
+
+### VPS2 Web Stack
+
+```yaml
+# ~/web/docker-compose.yml
+services:
+  traefik:    # Reverse proxy, auto-SSL (Let's Encrypt)
+    image: traefik:v3
+    ports: ["80:80", "443:443"]
+  website:    # Static Astro site
+    image: nginx:alpine
+    labels:
+      - "traefik.http.routers.website.rule=Host(`aivyx-studio.com`) || Host(`www.aivyx-studio.com`)"
+```
+
+**Deploy command:**
+```bash
+cd ~/Projects/aivyx/apps/website && npm run build
+rsync -avz --delete dist/ vps2:~/web/dist/
+ssh vps2 'cd ~/web && docker compose restart website'
+```
 
 ---
 
@@ -143,16 +176,21 @@ echo "<deploy-pubkey>" > /home/aivyx/.ssh/authorized_keys
 chmod 600 /home/aivyx/.ssh/authorized_keys
 chown -R aivyx:aivyx /home/aivyx/.ssh
 
-# 6. Harden SSH
-sed -i 's/#Port 22/Port 22022/' /etc/ssh/sshd_config
-sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-systemctl restart sshd
+# 6. Harden SSH (keep port 22 — see lesson learned below)
+sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart ssh  # Note: Ubuntu 24.04 uses 'ssh' not 'sshd'
 
 # 7. Test before disconnecting!
 # In a NEW terminal:
-ssh -p 22022 aivyx@<IP>
+ssh aivyx@<IP>
 ```
+
+> ⚠️ **Lesson Learned:** Do NOT change SSH port during initial provisioning.
+> Changing to port 22022 can cause lockout if the firewall doesn't allow the new port.
+> VPS1/VPS5 use port 22022 (configured before hardening). VPS2 uses default port 22.
+> Also note: Ubuntu 24.04 uses `systemctl restart ssh` (not `sshd`).
 
 ### Hostinger API Access
 
@@ -193,10 +231,21 @@ git push origin main                    # GitHub
 
 - [x] All VPS use non-root `aivyx` user
 - [x] SSH key-only authentication (passwords disabled)
-- [x] Custom SSH port (22022)
+- [x] Custom SSH port on VPS1/VPS5 (22022), default on VPS2 (22)
 - [x] 4 keys total, clear separation of concerns
 - [x] Old keys archived to `~/.ssh/old/`
-- [ ] Firewall rules: only 22022, 80, 443 open
-- [ ] Traefik with auto-SSL on all public services
+- [x] Traefik with auto-SSL on VPS2 (website)
+- [ ] Traefik with auto-SSL on VPS1 (engine API)
+- [ ] Firewall rules: only SSH + 80 + 443 open
 - [ ] Uptime monitoring configured
 - [ ] Automated backups scheduled
+
+---
+
+## Domain Map
+
+| Domain | Points To | Service |
+|--------|-----------|---------|
+| `aivyx-studio.com` | VPS2 (72.62.120.196) | Website |
+| `www.aivyx-studio.com` | VPS2 (72.62.120.196) | Website |
+| `aivyx-gitea.cloud` | VPS5 (148.230.102.223) | Gitea + CI |
