@@ -14,6 +14,8 @@ use aivyx_audit::AuditFilter;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Query parameters for `GET /audit`.
 #[derive(Debug, Deserialize)]
@@ -39,8 +41,10 @@ pub struct VerifyResponse {
 /// `GET /audit` — return recent audit entries.
 pub async fn recent_audit(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<AuditQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let entries = state.audit_log.recent(query.last.min(1000))?;
     Ok(axum::Json(entries))
 }
@@ -48,7 +52,9 @@ pub async fn recent_audit(
 /// `POST /audit/verify` — verify the HMAC chain integrity.
 pub async fn verify_audit(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     let result = state.audit_log.verify()?;
     Ok(axum::Json(VerifyResponse {
         valid: result.valid,
@@ -78,8 +84,10 @@ fn default_search_limit() -> usize {
 /// `GET /audit/search` — search audit entries by type and date range.
 pub async fn search_audit(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<SearchQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let filter = AuditFilter {
         event_types: query.event_type.map(|t| vec![t]),
         from: query

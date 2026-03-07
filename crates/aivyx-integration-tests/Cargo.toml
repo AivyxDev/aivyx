@@ -21,7 +21,9 @@ aivyx-agent = { workspace = true }
 aivyx-team = { workspace = true }
 aivyx-memory = { workspace = true }
 aivyx-task = { workspace = true }
+aivyx-billing = { workspace = true }
 aivyx-server = { workspace = true }
+aivyx-federation = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
 async-trait = { workspace = true }

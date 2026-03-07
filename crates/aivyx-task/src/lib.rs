@@ -31,12 +31,19 @@
 
 pub mod dag;
 pub mod engine;
+pub mod feedback;
 pub mod planner;
 pub mod progress;
+pub mod skill_scoring;
 pub mod store;
 pub mod types;
+pub mod workflow;
 
 pub use engine::TaskEngine;
 pub use progress::{ChannelProgressSink, ProgressEvent};
 pub use store::{TaskMetadata, TaskStore};
 pub use types::{ExecutionMode, Mission, Step, StepKind, StepStatus, TaskStatus};
+pub use workflow::{
+    StageCondition, StageResult, Workflow, WorkflowId, WorkflowMetadata, WorkflowStage,
+    WorkflowStatus, WorkflowStore,
+};

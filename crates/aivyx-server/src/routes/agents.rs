@@ -22,7 +22,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Response item for agent listing.
 #[derive(Debug, Serialize)]
@@ -36,7 +38,9 @@ pub struct AgentSummary {
 /// `GET /agents` — list all agent profiles.
 pub async fn list_agents(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let agents_dir = state.dirs.agents_dir();
     let mut agents = Vec::new();
 
@@ -61,8 +65,10 @@ pub async fn list_agents(
 /// `GET /agents/:name` — get a single agent profile.
 pub async fn get_agent(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
     let path = state.dirs.agents_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -92,8 +98,10 @@ pub struct CreateAgentRequest {
 /// `POST /agents` — create a new agent profile from JSON.
 pub async fn create_agent(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<CreateAgentRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&req.name)?;
     let path = state.dirs.agents_dir().join(format!("{}.toml", req.name));
     if path.exists() {
@@ -178,8 +186,10 @@ pub struct PatchPersonaRequest {
 /// `GET /agents/:name/persona` — get the persona for an agent.
 pub async fn get_persona(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
     let path = state.dirs.agents_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -201,9 +211,11 @@ pub async fn get_persona(
 /// `PATCH /agents/:name/persona` — partially update persona fields.
 pub async fn patch_persona(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<PatchPersonaRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
     let path = state.dirs.agents_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -290,9 +302,11 @@ pub struct UpdateCapabilitiesRequest {
 /// security-sensitive and warrant explicit handling and audit logging.
 pub async fn update_capabilities(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<UpdateCapabilitiesRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
     let path = state.dirs.agents_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -353,9 +367,11 @@ pub struct UpdateAgentRequest {
 /// Only non-null fields are applied; omitted fields keep their current values.
 pub async fn update_agent(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<UpdateAgentRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
     let path = state.dirs.agents_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -442,8 +458,10 @@ pub async fn update_agent(
 /// Refuses to delete the default "aivyx" agent.
 pub async fn delete_agent(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
     if name == "aivyx" {
         return Err(ServerError(AivyxError::Config(
@@ -479,9 +497,11 @@ pub struct DuplicateAgentRequest {
 /// `POST /agents/:name/duplicate` — copy an agent profile to a new name.
 pub async fn duplicate_agent(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(source_name): Path<String>,
     axum::Json(req): axum::Json<DuplicateAgentRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&source_name)?;
     validate_name(&req.new_name)?;
 

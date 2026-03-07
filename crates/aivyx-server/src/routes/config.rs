@@ -14,6 +14,8 @@ use aivyx_core::AivyxError;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Request body for `PATCH /config`.
 ///
@@ -39,7 +41,9 @@ pub struct PatchConfigRequest {
 /// `GET /config` — return the current system configuration.
 pub async fn get_config(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let config = AivyxConfig::load(state.dirs.config_path())?;
     Ok(axum::Json(config))
 }
@@ -50,8 +54,10 @@ pub async fn get_config(
 /// saves back, and returns the updated config.
 pub async fn patch_config(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<PatchConfigRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     let mut config = AivyxConfig::load(state.dirs.config_path())?;
 
     if let Some(autonomy) = req.autonomy {
@@ -78,7 +84,12 @@ pub async fn patch_config(
     }
 
     config.save(state.dirs.config_path())?;
-    Ok(axum::Json(config))
+
+    // Hot-reload: update in-memory config
+    let response = config.clone();
+    *state.config.write().await = config;
+
+    Ok(axum::Json(response))
 }
 
 #[cfg(test)]

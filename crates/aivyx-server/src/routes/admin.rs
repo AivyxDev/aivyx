@@ -13,6 +13,8 @@ use sha2::{Digest, Sha256};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Generate a cryptographically random 64-character hex token.
 ///
@@ -37,7 +39,9 @@ fn generate_random_token() -> String {
 /// this is the **only** time the plaintext token is exposed.
 pub async fn rotate_token(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     let new_token = generate_random_token();
 
     // Store in EncryptedStore

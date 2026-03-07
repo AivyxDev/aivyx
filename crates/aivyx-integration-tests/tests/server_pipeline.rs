@@ -2,6 +2,7 @@
 //!
 //! Uses `tower::ServiceExt::oneshot` to test the router without a TCP listener.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use aivyx_agent::{AgentProfile, AgentSession, SessionStore};
@@ -44,6 +45,11 @@ fn setup_test_state() -> (Arc<AppState>, std::path::PathBuf) {
     hasher.update(TEST_TOKEN.as_bytes());
     let bearer_token_hash: [u8; 32] = hasher.finalize().into();
 
+    std::fs::create_dir_all(dir.join("billing")).unwrap();
+    let cost_ledger = std::sync::Arc::new(
+        aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap(),
+    );
+
     let agent_dirs = AivyxDirs::new(&dir);
     let state = Arc::new(AppState {
         agent_session: Arc::new(AgentSession::new(agent_dirs, config.clone(), agent_key)),
@@ -52,13 +58,19 @@ fn setup_test_state() -> (Arc<AppState>, std::path::PathBuf) {
         audit_log,
         master_key,
         dirs,
-        config,
+        config: Arc::new(tokio::sync::RwLock::new(config)),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation: None,
         prometheus_handle: None,
+        tenant_store: None,
+        api_key_store: None,
+        multi_tenant_enabled: false,
+        cost_ledger,
+        budget_enforcer: None,
     });
 
     (state, dir)
@@ -80,7 +92,7 @@ async fn response_body(resp: axum::response::Response) -> serde_json::Value {
 #[tokio::test]
 async fn health_returns_200_no_auth() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let req = Request::builder()
         .uri("/health")
@@ -102,7 +114,7 @@ async fn health_returns_200_no_auth() {
 #[tokio::test]
 async fn auth_missing_returns_401() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let req = Request::builder()
         .uri("/status")
@@ -118,7 +130,7 @@ async fn auth_missing_returns_401() {
 #[tokio::test]
 async fn auth_wrong_token_returns_401() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let req = Request::builder()
         .uri("/status")
@@ -135,7 +147,7 @@ async fn auth_wrong_token_returns_401() {
 #[tokio::test]
 async fn auth_valid_token_passes() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -157,7 +169,7 @@ async fn auth_valid_token_passes() {
 #[tokio::test]
 async fn security_headers_present() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let req = Request::builder()
         .uri("/health")
@@ -181,7 +193,7 @@ async fn security_headers_present() {
 #[tokio::test]
 async fn list_agents_returns_profiles() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -203,7 +215,7 @@ async fn list_agents_returns_profiles() {
 #[tokio::test]
 async fn get_agent_returns_profile() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -223,7 +235,7 @@ async fn get_agent_returns_profile() {
 #[tokio::test]
 async fn get_agent_not_found_returns_404() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -241,7 +253,7 @@ async fn get_agent_not_found_returns_404() {
 #[tokio::test]
 async fn create_agent_returns_201() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let body = serde_json::json!({"name": "new-agent", "role": "helper"});
@@ -266,7 +278,7 @@ async fn create_agent_returns_201() {
 #[tokio::test]
 async fn list_sessions_empty() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -290,7 +302,7 @@ async fn list_sessions_empty() {
 #[tokio::test]
 async fn status_returns_summary() {
     let (state, dir) = setup_test_state();
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -324,7 +336,7 @@ async fn audit_recent_returns_entries() {
         })
         .unwrap();
 
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()
@@ -353,7 +365,7 @@ async fn audit_verify_returns_valid() {
         })
         .unwrap();
 
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     let (key, value) = auth_header();
     let req = Request::builder()

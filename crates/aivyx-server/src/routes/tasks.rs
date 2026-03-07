@@ -18,6 +18,8 @@ use serde::Deserialize;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Request body for `POST /tasks`.
 #[derive(Deserialize)]
@@ -34,8 +36,10 @@ pub struct CreateTaskRequest {
 /// can poll `GET /tasks/{id}` for progress.
 pub async fn create_task(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<CreateTaskRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let task_key = derive_task_key(&state.master_key);
     let store = TaskStore::open(state.dirs.tasks_dir().join("tasks.db"))?;
 
@@ -105,8 +109,10 @@ pub async fn create_task(
 /// `GET /tasks/{id}` — get mission status and step details.
 pub async fn get_task(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let task_id: TaskId = id
         .parse()
         .map_err(|_| ServerError(AivyxError::Config(format!("invalid task ID: {id}"))))?;
@@ -150,8 +156,10 @@ pub async fn get_task(
 /// `DELETE /tasks/{id}` — delete a completed/failed/cancelled mission.
 pub async fn delete_task(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let task_id: TaskId = id
         .parse()
         .map_err(|_| ServerError(AivyxError::Config(format!("invalid task ID: {id}"))))?;
@@ -167,7 +175,9 @@ pub async fn delete_task(
 /// `GET /tasks` — list all missions with summary metadata.
 pub async fn list_tasks(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let task_key = derive_task_key(&state.master_key);
     let store = TaskStore::open(state.dirs.tasks_dir().join("tasks.db"))?;
     let engine = TaskEngine::new(state.agent_session.clone(), store, task_key, None);
@@ -197,8 +207,10 @@ pub async fn list_tasks(
 /// Spawns background execution and returns immediately.
 pub async fn resume_task(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let task_id: TaskId = id
         .parse()
         .map_err(|_| ServerError(AivyxError::Config(format!("invalid task ID: {id}"))))?;
@@ -247,8 +259,10 @@ pub async fn resume_task(
 /// `POST /tasks/{id}/cancel` — cancel a running or planned mission.
 pub async fn cancel_task(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let task_id: TaskId = id
         .parse()
         .map_err(|_| ServerError(AivyxError::Config(format!("invalid task ID: {id}"))))?;

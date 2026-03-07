@@ -382,6 +382,8 @@ fn task_store_data_isolation() {
         retries: 0,
         started_at: None,
         completed_at: None,
+        depends_on: vec![],
+        kind: aivyx_task::StepKind::default(),
     }];
     store1.save(&mission, &key).unwrap();
 

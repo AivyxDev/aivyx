@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use aivyx_audit::AuditEvent;
+use aivyx_tenant::AuthContext;
 
 use crate::app_state::AppState;
 
@@ -30,7 +31,7 @@ const RATE_LIMIT_WINDOW_SECS: u64 = 60;
 /// for failed attempts. Logs `HttpAuthFailed` on rejection.
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
-    request: Request<axum::body::Body>,
+    mut request: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
     let remote_addr = request
@@ -86,6 +87,10 @@ pub async fn auth_middleware(
         )
             .into_response();
     }
+
+    // Insert AuthContext for downstream handlers to extract.
+    // In single-user mode (legacy bearer token), this grants Admin role.
+    request.extensions_mut().insert(AuthContext::single_user());
 
     next.run(request).await
 }

@@ -138,7 +138,7 @@ async fn semantic_search_returns_relevant_results() {
 #[tokio::test]
 async fn knowledge_triple_crud() {
     let (store, provider, key, dir) = setup_memory(4);
-    let mgr = MemoryManager::new(store, provider, key, 0).unwrap();
+    let mut mgr = MemoryManager::new(store, provider, key, 0).unwrap();
 
     // Create
     let t1 = mgr

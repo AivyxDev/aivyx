@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Summary item for project listing.
 #[derive(Debug, Serialize)]
@@ -30,7 +32,9 @@ pub struct ProjectSummary {
 /// `GET /projects` — list all registered projects.
 pub async fn list_projects(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
 
     let projects: Vec<ProjectSummary> = config
@@ -62,8 +66,10 @@ pub struct CreateProjectRequest {
 /// `POST /projects` — register a new project.
 pub async fn create_project(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<CreateProjectRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let abs_path = std::path::PathBuf::from(&req.path);
     if !abs_path.is_dir() {
         return Err(ServerError(AivyxError::Config(format!(
@@ -106,8 +112,10 @@ pub async fn create_project(
 /// `DELETE /projects/{name}` — remove a registered project.
 pub async fn delete_project(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
 
     let mut config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;

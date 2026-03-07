@@ -12,18 +12,22 @@
 //! - `tasks/get` — retrieve task status and artifacts
 //! - `tasks/cancel` — cancel a running task
 
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use aivyx_agent::AgentProfile;
 use aivyx_core::a2a::{
-    A2aArtifact, A2aMessage, A2aPart, A2aRole, A2aTask, A2aTaskState, A2aTaskStatus, AgentCard,
-    AgentAuthentication, AgentCapabilities, AgentSkill, JsonRpcRequest, JsonRpcResponse,
+    A2aArtifact, A2aMessage, A2aPart, A2aRole, A2aTask, A2aTaskState, A2aTaskStatus,
+    AgentCard, AgentAuthentication, AgentCapabilities, AgentSkill, JsonRpcRequest,
+    JsonRpcResponse, PushNotificationConfig, TaskStatusUpdateEvent,
 };
 use aivyx_core::{AivyxError, TaskId};
 use aivyx_crypto::derive_task_key;
 use aivyx_task::{Mission, StepKind, StepStatus, TaskEngine, TaskStatus, TaskStore};
 use axum::extract::State;
 use axum::response::IntoResponse;
+use axum::response::sse::{Event, Sse};
+use futures_util::stream::Stream;
 
 use crate::app_state::AppState;
 
@@ -57,8 +61,8 @@ pub async fn agent_card(State(state): State<Arc<AppState>>) -> impl IntoResponse
         }
     }
 
-    let base_url = state
-        .config
+    let config = state.config.read().await;
+    let base_url = config
         .server
         .as_ref()
         .and_then(|s| s.public_url.as_deref())
@@ -75,7 +79,7 @@ pub async fn agent_card(State(state): State<Arc<AppState>>) -> impl IntoResponse
         version: env!("CARGO_PKG_VERSION").to_string(),
         capabilities: AgentCapabilities {
             streaming: true,
-            push_notifications: false,
+            push_notifications: true,
         },
         skills,
         default_input_modes: vec!["text/plain".to_string()],
@@ -106,6 +110,9 @@ pub async fn a2a_handler(
         "tasks/send" => handle_task_send(&state, &req).await,
         "tasks/get" => handle_task_get(&state, &req).await,
         "tasks/cancel" => handle_task_cancel(&state, &req).await,
+        "tasks/pushNotification/set" => handle_push_notification_set(&state, &req).await,
+        "tasks/pushNotification/get" => handle_push_notification_get(&state, &req).await,
+        "tasks/pushNotification/delete" => handle_push_notification_delete(&state, &req).await,
         _ => Ok(JsonRpcResponse::error(
             req.id.clone(),
             -32601,
@@ -295,6 +302,268 @@ async fn handle_task_cancel(
     let result = serde_json::to_value(&a2a_task)
         .map_err(|e| AivyxError::Other(format!("serialize A2A task: {e}")))?;
     Ok(JsonRpcResponse::success(req.id.clone(), result))
+}
+
+// ---------------------------------------------------------------------------
+// tasks/sendSubscribe — SSE streaming variant of tasks/send
+// ---------------------------------------------------------------------------
+
+/// `POST /a2a/stream` — SSE streaming variant of `tasks/send`.
+///
+/// Accepts the same JSON-RPC body as `tasks/send` but returns an SSE stream
+/// of `TaskStatusUpdateEvent` messages. Currently a stub that emits a
+/// "submitted" event followed by a "completed" event (the full mission
+/// execution loop is not yet wired into the stream).
+pub async fn a2a_stream_handler(
+    State(state): State<Arc<AppState>>,
+    axum::Json(req): axum::Json<JsonRpcRequest>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, axum::Json<JsonRpcResponse>> {
+    if req.method.as_str() != "tasks/sendSubscribe" {
+        return Err(axum::Json(JsonRpcResponse::error(
+            req.id.clone(),
+            -32601,
+            format!("streaming endpoint only supports tasks/sendSubscribe, got: {}", req.method),
+        )));
+    }
+
+    // Extract the message text from params (same as tasks/send)
+    let message: A2aMessage = serde_json::from_value(
+        req.params
+            .get("message")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    )
+    .map_err(|e| {
+        axum::Json(JsonRpcResponse::error(
+            req.id.clone(),
+            -32602,
+            format!("invalid message in params: {e}"),
+        ))
+    })?;
+
+    let goal = extract_text_from_parts(&message.parts);
+    if goal.is_empty() {
+        return Err(axum::Json(JsonRpcResponse::error(
+            req.id.clone(),
+            -32602,
+            "message must contain at least one text part",
+        )));
+    }
+
+    let agent_name = req
+        .params
+        .get("agent")
+        .and_then(|v| v.as_str())
+        .unwrap_or("assistant")
+        .to_string();
+
+    // Create the mission via TaskEngine
+    let task_key = derive_task_key(&state.master_key);
+    let store = TaskStore::open(state.dirs.tasks_dir().join("tasks.db")).map_err(|e| {
+        axum::Json(JsonRpcResponse::error(
+            req.id.clone(),
+            -32000,
+            e.to_string(),
+        ))
+    })?;
+    let engine = TaskEngine::new(state.agent_session.clone(), store, task_key, None);
+
+    let task_id = engine
+        .create_mission(&goal, &agent_name, None)
+        .await
+        .map_err(|e| {
+            axum::Json(JsonRpcResponse::error(
+                req.id.clone(),
+                -32000,
+                e.to_string(),
+            ))
+        })?;
+
+    let task_id_str = task_id.to_string();
+
+    // Build the SSE stream with stub events
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(8);
+
+    // Spawn background task to emit events
+    let bg_state = state.clone();
+    let bg_task_id = task_id;
+    let bg_task_id_str = task_id_str.clone();
+    tokio::spawn(async move {
+        // Emit "submitted" event
+        let submitted = TaskStatusUpdateEvent {
+            id: bg_task_id_str.clone(),
+            status: A2aTaskStatus {
+                state: A2aTaskState::Submitted,
+                message: Some(A2aMessage {
+                    role: A2aRole::Agent,
+                    parts: vec![A2aPart::Text {
+                        text: format!("Task created and queued for execution with agent '{agent_name}'"),
+                    }],
+                }),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            },
+            is_final: false,
+        };
+        if let Ok(data) = serde_json::to_string(&submitted) {
+            let _ = tx.send(Ok(Event::default().data(data))).await;
+        }
+
+        // Spawn background execution (same pattern as tasks/send)
+        let bg_master_key_bytes = {
+            let tk = derive_task_key(&bg_state.master_key);
+            let mut bytes = [0u8; 32];
+            bytes.copy_from_slice(tk.expose_secret());
+            bytes
+        };
+        let bg_dirs = aivyx_config::AivyxDirs::new(bg_state.dirs.root());
+        let task_key = aivyx_crypto::MasterKey::from_bytes(bg_master_key_bytes);
+        let store = match TaskStore::open(bg_dirs.tasks_dir().join("tasks.db")) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("A2A stream: failed to open task store: {e}");
+                return;
+            }
+        };
+        let engine = TaskEngine::new(bg_state.agent_session.clone(), store, task_key, None);
+        let exec_result = engine.execute_mission(&bg_task_id, None, None).await;
+
+        // Emit "completed" or "failed" event
+        let final_event = match exec_result {
+            Ok(_) => TaskStatusUpdateEvent {
+                id: bg_task_id_str.clone(),
+                status: A2aTaskStatus {
+                    state: A2aTaskState::Completed,
+                    message: Some(A2aMessage {
+                        role: A2aRole::Agent,
+                        parts: vec![A2aPart::Text {
+                            text: "Task completed successfully".to_string(),
+                        }],
+                    }),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+                is_final: true,
+            },
+            Err(e) => TaskStatusUpdateEvent {
+                id: bg_task_id_str.clone(),
+                status: A2aTaskStatus {
+                    state: A2aTaskState::Failed,
+                    message: Some(A2aMessage {
+                        role: A2aRole::Agent,
+                        parts: vec![A2aPart::Text {
+                            text: format!("Task failed: {e}"),
+                        }],
+                    }),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+                is_final: true,
+            },
+        };
+
+        if let Ok(data) = serde_json::to_string(&final_event) {
+            let _ = tx.send(Ok(Event::default().data(data))).await;
+        }
+    });
+
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+    Ok(Sse::new(stream))
+}
+
+// ---------------------------------------------------------------------------
+// tasks/pushNotification/set — store push notification config for a task
+// ---------------------------------------------------------------------------
+
+/// Handle `tasks/pushNotification/set` — store a push notification config
+/// for the given task ID.
+async fn handle_push_notification_set(
+    state: &AppState,
+    req: &JsonRpcRequest,
+) -> Result<JsonRpcResponse, AivyxError> {
+    let task_id = req
+        .params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AivyxError::Other("missing 'id' in params".into()))?
+        .to_string();
+
+    let config: PushNotificationConfig = serde_json::from_value(
+        req.params
+            .get("pushNotificationConfig")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    )
+    .map_err(|e| AivyxError::Other(format!("invalid pushNotificationConfig: {e}")))?;
+
+    state
+        .push_notification_configs
+        .write()
+        .await
+        .insert(task_id.clone(), config.clone());
+
+    let result = serde_json::to_value(&config)
+        .map_err(|e| AivyxError::Other(format!("serialize config: {e}")))?;
+    Ok(JsonRpcResponse::success(req.id.clone(), result))
+}
+
+// ---------------------------------------------------------------------------
+// tasks/pushNotification/get — retrieve push notification config for a task
+// ---------------------------------------------------------------------------
+
+/// Handle `tasks/pushNotification/get` — retrieve the push notification
+/// config for the given task ID.
+async fn handle_push_notification_get(
+    state: &AppState,
+    req: &JsonRpcRequest,
+) -> Result<JsonRpcResponse, AivyxError> {
+    let task_id = req
+        .params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AivyxError::Other("missing 'id' in params".into()))?;
+
+    let configs = state.push_notification_configs.read().await;
+    match configs.get(task_id) {
+        Some(config) => {
+            let result = serde_json::to_value(config)
+                .map_err(|e| AivyxError::Other(format!("serialize config: {e}")))?;
+            Ok(JsonRpcResponse::success(req.id.clone(), result))
+        }
+        None => Ok(JsonRpcResponse::error(
+            req.id.clone(),
+            -32602,
+            format!("no push notification config for task: {task_id}"),
+        )),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// tasks/pushNotification/delete — remove push notification config for a task
+// ---------------------------------------------------------------------------
+
+/// Handle `tasks/pushNotification/delete` — remove the push notification
+/// config for the given task ID.
+async fn handle_push_notification_delete(
+    state: &AppState,
+    req: &JsonRpcRequest,
+) -> Result<JsonRpcResponse, AivyxError> {
+    let task_id = req
+        .params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AivyxError::Other("missing 'id' in params".into()))?;
+
+    let mut configs = state.push_notification_configs.write().await;
+    if configs.remove(task_id).is_some() {
+        Ok(JsonRpcResponse::success(
+            req.id.clone(),
+            serde_json::json!({"deleted": true}),
+        ))
+    } else {
+        Ok(JsonRpcResponse::error(
+            req.id.clone(),
+            -32602,
+            format!("no push notification config for task: {task_id}"),
+        ))
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -20,7 +20,9 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Summary of a team for listing.
 #[derive(Debug, Serialize)]
@@ -68,7 +70,9 @@ pub struct TeamSessionSummary {
 /// `GET /teams` — list all team configurations.
 pub async fn list_teams(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let teams_dir = state.dirs.teams_dir();
     let mut teams = Vec::new();
 
@@ -93,8 +97,10 @@ pub async fn list_teams(
 /// `GET /teams/:name` — get a single team configuration.
 pub async fn get_team(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
     let path = state.dirs.teams_dir().join(format!("{name}.toml"));
     if !path.exists() {
@@ -109,11 +115,13 @@ pub async fn get_team(
 /// `POST /teams/:name/run` — run a team task (non-streaming).
 pub async fn run_team(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<TeamRunRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
-    let runtime = load_runtime(&state, &name)?;
+    let runtime = load_runtime(&state, &name).await?;
     let response = runtime.run(&req.prompt, None).await?;
 
     // Generate or reuse session ID, save session
@@ -150,11 +158,13 @@ pub async fn run_team(
 /// `POST /teams/:name/run/stream` — run a team task (SSE streaming).
 pub async fn stream_run_team(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<TeamRunRequest>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
-    let runtime = load_runtime(&state, &name)?;
+    let runtime = load_runtime(&state, &name).await?;
     let (token_tx, token_rx) = tokio::sync::mpsc::channel::<String>(64);
     let (sse_tx, sse_rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
 
@@ -205,8 +215,10 @@ pub async fn stream_run_team(
 /// `GET /teams/:name/sessions` — list saved sessions for a team.
 pub async fn list_team_sessions(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
     let ts_key = aivyx_crypto::derive_team_session_key(&state.master_key);
     let ts_dir = state.dirs.team_sessions_dir();
@@ -233,7 +245,7 @@ pub async fn list_team_sessions(
 }
 
 /// Load a `TeamRuntime` for the given team name.
-fn load_runtime(state: &AppState, name: &str) -> Result<TeamRuntime, ServerError> {
+async fn load_runtime(state: &AppState, name: &str) -> Result<TeamRuntime, ServerError> {
     // TeamRuntime::load consumes an AgentSession, so we create a fresh one
     let dirs = aivyx_config::AivyxDirs::new(state.dirs.root());
     // We need a fresh MasterKey for AgentSession — re-derive from the same bytes
@@ -241,14 +253,14 @@ fn load_runtime(state: &AppState, name: &str) -> Result<TeamRuntime, ServerError
     // In practice, the AgentSession already exists in state — but TeamRuntime::load
     // consumes AgentSession by value. We can't clone AgentSession either.
     // Workaround: use TeamRuntime::new() with a loaded TeamConfig and a fresh session.
-    let runtime = TeamRuntime::load(name, &dirs, create_agent_session(state)?)?;
+    let runtime = TeamRuntime::load(name, &dirs, create_agent_session(state).await?)?;
     Ok(runtime)
 }
 
 /// Create a fresh `AgentSession` for team runtime.
 ///
 /// This is needed because `TeamRuntime::load` consumes the session by value.
-fn create_agent_session(state: &AppState) -> Result<AgentSession, ServerError> {
+async fn create_agent_session(state: &AppState) -> Result<AgentSession, ServerError> {
     // We need a MasterKey, but it's not Clone.
     // Workaround: derive a deterministic key from master key bytes.
     // This is safe because we're creating an equivalent key.
@@ -257,7 +269,8 @@ fn create_agent_session(state: &AppState) -> Result<AgentSession, ServerError> {
         .map_err(|_| ServerError(AivyxError::Crypto("invalid master key length".into())))?;
     let mk = aivyx_crypto::MasterKey::from_bytes(key_bytes);
     let dirs = aivyx_config::AivyxDirs::new(state.dirs.root());
-    Ok(AgentSession::new(dirs, state.config.clone(), mk))
+    let config = state.config.read().await.clone();
+    Ok(AgentSession::new(dirs, config, mk))
 }
 
 #[cfg(test)]

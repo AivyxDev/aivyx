@@ -48,6 +48,24 @@ impl SpawnSpecialistTool {
             spawned_count: Arc::new(AtomicUsize::new(0)),
         }
     }
+
+    /// Clean up an ephemeral specialist agent.
+    ///
+    /// Removes the agent from both the [`SpecialistPool`] and the
+    /// [`MessageBus`], and decrements the spawned count so the slot can
+    /// be reused.
+    pub async fn cleanup_agent(&self, name: &str) -> Result<()> {
+        self.pool.deregister_spawned(name).await;
+        self.bus.deregister_agent(name)?;
+        // Decrement, but never below zero
+        self.spawned_count
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
+                if c > 0 { Some(c - 1) } else { Some(0) }
+            })
+            .ok();
+        info!("Cleaned up ephemeral agent '{}'", name);
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -156,7 +174,7 @@ mod tests {
         let pool = SpecialistPool::new(
             Arc::clone(&session),
             Some(Arc::clone(&bus)),
-            aivyx_capability::CapabilitySet::empty(),
+            aivyx_capability::CapabilitySet::new(),
             None,
             crate::config::DialogueConfig::default(),
         );
@@ -167,6 +185,43 @@ mod tests {
         let schema = tool.input_schema();
         assert!(schema["properties"]["agent_name"].is_object());
         assert!(schema["properties"]["role"].is_object());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn cleanup_agent_decrements_count_and_deregisters() {
+        let dir = std::env::temp_dir().join(format!("aivyx-cleanup-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dirs = aivyx_config::AivyxDirs::new(&dir);
+        let config = aivyx_config::AivyxConfig::default();
+        let key = aivyx_crypto::MasterKey::generate();
+        let session = Arc::new(AgentSession::new(dirs, config, key));
+
+        let names = vec!["lead".to_string()];
+        let bus = Arc::new(MessageBus::new(&names));
+        let pool = SpecialistPool::new(
+            Arc::clone(&session),
+            Some(Arc::clone(&bus)),
+            aivyx_capability::CapabilitySet::new(),
+            None,
+            crate::config::DialogueConfig::default(),
+        );
+
+        let tool = SpawnSpecialistTool::new(session, pool, Arc::clone(&bus), 5);
+
+        // Simulate a spawned agent: register in bus + bump count
+        bus.register_agent("ephemeral").unwrap();
+        tool.spawned_count.fetch_add(1, Ordering::Relaxed);
+        assert_eq!(tool.spawned_count.load(Ordering::Relaxed), 1);
+
+        // Cleanup
+        tool.cleanup_agent("ephemeral").await.unwrap();
+
+        // Count decremented
+        assert_eq!(tool.spawned_count.load(Ordering::Relaxed), 0);
+        // Agent removed from bus
+        assert!(bus.subscribe("ephemeral").is_none());
 
         std::fs::remove_dir_all(&dir).ok();
     }

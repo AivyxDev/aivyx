@@ -19,6 +19,7 @@ aivyx-agent = { workspace = true, features = ["federation"] }
 aivyx-memory = { workspace = true }
 aivyx-task = { workspace = true }
 aivyx-team = { workspace = true }
+aivyx-tenant = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
@@ -27,6 +28,7 @@ tokio-stream = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+hmac = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
@@ -41,9 +43,15 @@ tokio-util = { workspace = true }
 governor = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
+aivyx-billing = { workspace = true }
 aivyx-federation = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
+toml = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 http-body-util = "0.1"
-rand = { workspace = true }
+tempfile = "3"
+proptest = { workspace = true }

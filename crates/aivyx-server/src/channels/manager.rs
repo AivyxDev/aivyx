@@ -169,7 +169,7 @@ impl MessageHandler {
         if let Some(persisted) = self.state.session_store.load(
             &session_id,
             &self.state.master_key,
-            self.state.config.memory.session_max_age_hours,
+            self.state.config.read().await.memory.session_max_age_hours,
         )? {
             agent.restore_conversation(persisted.messages);
         }
@@ -572,6 +572,12 @@ mod tests {
 
         let bearer_hash = [0u8; 32];
 
+        std::fs::create_dir_all(dir.join("billing")).ok();
+        let cost_ledger = Arc::new(
+            aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db"))
+                .expect("cost ledger open"),
+        );
+
         Arc::new(AppState {
             agent_session,
             session_store,
@@ -579,13 +585,19 @@ mod tests {
             audit_log,
             master_key,
             dirs,
-            config,
+            config: Arc::new(tokio::sync::RwLock::new(config)),
+            push_notification_configs: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             bearer_token_hash: tokio::sync::RwLock::new(bearer_hash),
             auth_rate_limiter: std::sync::Mutex::new(HashMap::new()),
             sidecar_mode: false,
             endpoint_rate_limiters: None,
             federation: None,
             prometheus_handle: None,
+            tenant_store: None,
+            api_key_store: None,
+            multi_tenant_enabled: false,
+            cost_ledger,
+            budget_enforcer: None,
         })
     }
 }

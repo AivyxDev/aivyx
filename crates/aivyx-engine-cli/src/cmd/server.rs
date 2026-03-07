@@ -97,7 +97,7 @@ pub async fn start(
     let _channel_handle = aivyx_server::channels::spawn_channel_manager(state.clone());
     let _scheduler_handle = aivyx_server::scheduler::spawn_scheduler(state.clone());
 
-    let router = build_router(state);
+    let router = build_router(state).await;
 
     // Bind first, then read the actual address (supports port 0)
     let addr = format!("{bind_addr}:{bind_port}");

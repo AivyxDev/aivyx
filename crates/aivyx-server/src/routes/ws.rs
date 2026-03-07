@@ -50,9 +50,11 @@ const AUTH_TIMEOUT_SECS: u64 = 5;
 enum ClientMessage {
     /// First message: authenticate with bearer token.
     Auth { token: String },
-    /// Send a chat message to an agent.
+    /// Send a chat message to an agent (optionally with images).
     Message {
         text: String,
+        #[serde(default)]
+        images: Vec<crate::routes::chat::ImageInput>,
         #[serde(default = "default_agent")]
         agent: String,
         session_id: Option<String>,
@@ -202,6 +204,8 @@ pub async fn ws_handler(
 ) -> impl IntoResponse {
     let max_size = state
         .config
+        .read()
+        .await
         .server
         .as_ref()
         .map(|s| s.ws_max_message_size)
@@ -280,6 +284,8 @@ async fn handle_connection(socket: WebSocket, state: Arc<AppState>) {
         // at the frame level, but we audit any message that slips through).
         let ws_max = state
             .config
+            .read()
+            .await
             .server
             .as_ref()
             .map(|s| s.ws_max_message_size)
@@ -318,6 +324,7 @@ async fn handle_connection(socket: WebSocket, state: Arc<AppState>) {
             }
             ClientMessage::Message {
                 text,
+                images,
                 agent,
                 session_id,
                 project,
@@ -353,6 +360,7 @@ async fn handle_connection(socket: WebSocket, state: Arc<AppState>) {
                         turn_tx,
                         TurnParams {
                             text,
+                            images,
                             agent_name: agent,
                             session_id,
                             project,
@@ -495,6 +503,7 @@ async fn authenticate(
 /// Parameters for an agent turn over WebSocket.
 struct TurnParams {
     text: String,
+    images: Vec<crate::routes::chat::ImageInput>,
     agent_name: String,
     session_id: Option<String>,
     project: Option<String>,
@@ -522,8 +531,9 @@ async fn run_agent_turn(
     };
 
     // Set active project if specified
+    let config = state.config.read().await;
     if let Some(ref project_name) = params.project
-        && let Some(proj) = state.config.find_project(project_name)
+        && let Some(proj) = config.find_project(project_name)
     {
         agent.set_active_project(proj.clone());
     }
@@ -534,11 +544,12 @@ async fn run_agent_turn(
         && let Ok(Some(persisted)) = state.session_store.load(
             &sid,
             &state.master_key,
-            state.config.memory.session_max_age_hours,
+            config.memory.session_max_age_hours,
         )
     {
         agent.restore_conversation(persisted.messages);
     }
+    drop(config);
 
     // Wire memory manager if available
     if let Some(ref mm) = state.memory_manager {
@@ -582,14 +593,25 @@ async fn run_agent_turn(
         return;
     }
 
-    let result = agent
-        .turn_stream(
-            &params.text,
-            channel_ref,
-            token_tx,
-            Some(params.cancel_token),
-        )
-        .await;
+    let result = if params.images.is_empty() {
+        agent
+            .turn_stream(
+                &params.text,
+                channel_ref,
+                token_tx,
+                Some(params.cancel_token),
+            )
+            .await
+    } else {
+        agent
+            .turn_stream_with_content(
+                crate::routes::chat::build_multimodal_content(&params.text, &params.images),
+                channel_ref,
+                token_tx,
+                Some(params.cancel_token),
+            )
+            .await
+    };
 
     // Wait for token forwarder to finish
     let _ = token_forwarder.await;
@@ -755,5 +777,88 @@ mod tests {
         let json = serde_json::to_value(&msg).unwrap();
         assert_eq!(json["type"], "auth_error");
         assert_eq!(json["message"], "bad token");
+    }
+
+    #[test]
+    fn client_message_with_images_deserializes() {
+        let json = r#"{
+            "type": "message",
+            "text": "what is this?",
+            "images": [{"media_type": "image/png", "data": "iVBOR"}],
+            "agent": "vision-agent"
+        }"#;
+        let msg: ClientMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMessage::Message { text, images, agent, .. } => {
+                assert_eq!(text, "what is this?");
+                assert_eq!(images.len(), 1);
+                assert_eq!(images[0].media_type, "image/png");
+                assert_eq!(agent, "vision-agent");
+            }
+            _ => panic!("expected Message variant"),
+        }
+    }
+
+    #[test]
+    fn client_message_without_images_backward_compat() {
+        let json = r#"{"type":"message","text":"hello","agent":"test"}"#;
+        let msg: ClientMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMessage::Message { images, .. } => assert!(images.is_empty()),
+            _ => panic!("expected Message variant"),
+        }
+    }
+
+    mod fuzz {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn fuzz_client_message_parse_never_panics(s in "\\PC*") {
+                let _ = serde_json::from_str::<ClientMessage>(&s);
+            }
+
+            #[test]
+            fn fuzz_server_message_serialize_never_panics(content in "\\PC{0,200}") {
+                let msg = ServerMessage::Token { content };
+                let _ = serde_json::to_string(&msg).unwrap();
+            }
+
+            #[test]
+            fn message_variant_is_never_auth(
+                text in "[a-zA-Z0-9 ]{1,50}",
+                agent in "[a-z]{1,20}"
+            ) {
+                let json = serde_json::json!({
+                    "type": "message",
+                    "text": text,
+                    "agent": agent
+                });
+                let msg: ClientMessage = serde_json::from_value(json).unwrap();
+                let is_auth = matches!(msg, ClientMessage::Auth { .. });
+                prop_assert!(!is_auth);
+            }
+
+            #[test]
+            fn approval_response_deserialize(
+                request_id in "[a-zA-Z0-9-]{1,36}",
+                approved in proptest::bool::ANY
+            ) {
+                let json = serde_json::json!({
+                    "type": "approval_response",
+                    "request_id": request_id,
+                    "approved": approved
+                });
+                let msg: ClientMessage = serde_json::from_value(json).unwrap();
+                match msg {
+                    ClientMessage::ApprovalResponse { request_id: rid, approved: app } => {
+                        prop_assert_eq!(rid, request_id);
+                        prop_assert_eq!(app, approved);
+                    }
+                    _ => prop_assert!(false, "expected ApprovalResponse variant"),
+                }
+            }
+        }
     }
 }

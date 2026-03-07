@@ -8,8 +8,14 @@
 //! specify `depends_on` relationships between steps, enabling parallel execution
 //! of independent steps.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
+
 use aivyx_core::{AivyxError, Result};
 use aivyx_llm::{ChatMessage, ChatRequest, LlmProvider};
+use aivyx_memory::{MemoryEntry, MemoryKind, MemoryManager, OutcomeFilter, OutcomeSource};
 
 use crate::dag;
 use crate::types::{Step, StepStatus};
@@ -62,12 +68,12 @@ pub async fn plan_mission(
 
     let response = provider.chat(&request).await?;
 
-    let text = &response.message.content;
-    if text.is_empty() {
+    let content = &response.message.content;
+    if content.is_empty() {
         return Err(AivyxError::Task("planner returned empty response".into()));
     }
 
-    parse_plan_response(text)
+    parse_plan_response(content.text())
 }
 
 /// System prompt for DAG-aware planning with dependency relationships.
@@ -113,17 +119,180 @@ pub async fn plan_mission_dag(
 
     let response = provider.chat(&request).await?;
 
-    let text = &response.message.content;
-    if text.is_empty() {
+    let content = &response.message.content;
+    if content.is_empty() {
         return Err(AivyxError::Task("planner returned empty response".into()));
     }
 
-    let steps = parse_plan_response(text)?;
+    let steps = parse_plan_response(content.text())?;
 
     // Validate the DAG before returning
     dag::validate_dag(&steps)?;
 
     Ok(steps)
+}
+
+/// Plan a mission with memory augmentation.
+///
+/// Before planning, recalls relevant memories and past outcomes for the goal,
+/// then injects them as a `[PLANNING MEMORY]` block into the system prompt.
+pub async fn plan_mission_with_memory(
+    provider: &dyn LlmProvider,
+    goal: &str,
+    max_tokens: u32,
+    memory_manager: &Arc<Mutex<MemoryManager>>,
+) -> Result<Vec<Step>> {
+    let memory_block = build_memory_block(goal, memory_manager).await?;
+
+    let augmented_prompt = if memory_block.is_empty() {
+        PLANNING_SYSTEM_PROMPT.to_string()
+    } else {
+        format!("{}\n\n{}", PLANNING_SYSTEM_PROMPT, memory_block)
+    };
+
+    let request = ChatRequest {
+        system_prompt: Some(augmented_prompt),
+        messages: vec![ChatMessage::user(goal)],
+        tools: vec![],
+        model: None,
+        max_tokens,
+    };
+
+    let response = provider.chat(&request).await?;
+
+    let content = &response.message.content;
+    if content.is_empty() {
+        return Err(AivyxError::Task("planner returned empty response".into()));
+    }
+
+    parse_plan_response(content.text())
+}
+
+/// Plan a DAG mission with memory augmentation.
+///
+/// Like [`plan_mission_with_memory`] but uses the DAG-aware planning prompt,
+/// producing steps with `depends_on` relationships for parallel execution.
+pub async fn plan_mission_dag_with_memory(
+    provider: &dyn LlmProvider,
+    goal: &str,
+    max_tokens: u32,
+    memory_manager: &Arc<Mutex<MemoryManager>>,
+) -> Result<Vec<Step>> {
+    let memory_block = build_memory_block(goal, memory_manager).await?;
+
+    let augmented_prompt = if memory_block.is_empty() {
+        DAG_PLANNING_SYSTEM_PROMPT.to_string()
+    } else {
+        format!("{}\n\n{}", DAG_PLANNING_SYSTEM_PROMPT, memory_block)
+    };
+
+    let request = ChatRequest {
+        system_prompt: Some(augmented_prompt),
+        messages: vec![ChatMessage::user(goal)],
+        tools: vec![],
+        model: None,
+        max_tokens,
+    };
+
+    let response = provider.chat(&request).await?;
+
+    let content = &response.message.content;
+    if content.is_empty() {
+        return Err(AivyxError::Task("planner returned empty response".into()));
+    }
+
+    let steps = parse_plan_response(content.text())?;
+
+    // Validate the DAG before returning
+    dag::validate_dag(&steps)?;
+
+    Ok(steps)
+}
+
+/// Build a memory context block for the planner.
+///
+/// Recalls relevant memories and queries recent outcomes, then formats them
+/// into a `[PLANNING MEMORY]` block for system prompt augmentation.
+async fn build_memory_block(
+    goal: &str,
+    memory_manager: &Arc<Mutex<MemoryManager>>,
+) -> Result<String> {
+    let mut mgr = memory_manager.lock().await;
+
+    // 1. Recall up to 5 relevant memories
+    let memories = mgr.recall(goal, 5, None, &[]).await?;
+
+    // 2. Query recent outcomes (last 20)
+    let outcomes = mgr.query_outcomes(&OutcomeFilter {
+        limit: Some(20),
+        ..Default::default()
+    })?;
+
+    if memories.is_empty() && outcomes.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut block = String::from("[PLANNING MEMORY]\n");
+
+    if !memories.is_empty() {
+        block.push_str("Relevant past experiences:\n");
+        for (i, m) in memories.iter().enumerate() {
+            block.push_str(&format!(
+                "{}. [{}] {}\n",
+                i + 1,
+                format_memory_kind(&m.kind),
+                m.content
+            ));
+        }
+    }
+
+    if !outcomes.is_empty() {
+        block.push_str("\nPast tool statistics:\n");
+
+        // Group outcomes by tool, compute success rate
+        let mut tool_stats: HashMap<String, (u32, u32)> = HashMap::new();
+        for outcome in &outcomes {
+            let tool_name = match &outcome.source {
+                OutcomeSource::ToolCall { tool_name } => tool_name.clone(),
+                OutcomeSource::MissionStep { .. } => "mission_step".to_string(),
+                OutcomeSource::Delegation { specialist, .. } => {
+                    format!("delegate:{specialist}")
+                }
+                OutcomeSource::SpecialistSuggestion { .. } => "suggestion".to_string(),
+            };
+            let entry = tool_stats.entry(tool_name).or_insert((0, 0));
+            entry.1 += 1; // total
+            if outcome.success {
+                entry.0 += 1; // successes
+            }
+        }
+
+        let mut sorted_tools: Vec<_> = tool_stats.into_iter().collect();
+        sorted_tools.sort_by(|a, b| a.0.cmp(&b.0));
+
+        for (tool, (successes, total)) in &sorted_tools {
+            let rate = (*successes as f64 / *total as f64 * 100.0) as u32;
+            block.push_str(&format!(
+                "- {tool}: {rate}% success ({total} uses)\n"
+            ));
+        }
+    }
+
+    block.push_str("[END PLANNING MEMORY]");
+    Ok(block)
+}
+
+/// Format a memory kind as a human-readable label for planning context.
+fn format_memory_kind(kind: &MemoryKind) -> &str {
+    match kind {
+        MemoryKind::Fact => "fact",
+        MemoryKind::Preference => "preference",
+        MemoryKind::SessionSummary => "session",
+        MemoryKind::Procedure => "procedure",
+        MemoryKind::Decision => "decision",
+        MemoryKind::Outcome => "outcome",
+        MemoryKind::Custom(s) => s,
+    }
 }
 
 /// Parse the LLM response into a list of steps.
@@ -171,6 +340,162 @@ fn strip_code_fences(text: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aivyx_memory::{MemoryStore, OutcomeRecord};
+
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A mock embedding provider that returns deterministic vectors based on
+    /// a simple hash of the input text. Tracks call count.
+    struct MockEmbeddingProvider {
+        dims: usize,
+        call_count: AtomicUsize,
+    }
+
+    impl MockEmbeddingProvider {
+        fn new(dims: usize) -> Self {
+            Self {
+                dims,
+                call_count: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl aivyx_llm::EmbeddingProvider for MockEmbeddingProvider {
+        fn name(&self) -> &str {
+            "mock"
+        }
+
+        fn dimensions(&self) -> usize {
+            self.dims
+        }
+
+        async fn embed(&self, text: &str) -> aivyx_core::Result<aivyx_llm::Embedding> {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            let mut vector = vec![0.0_f32; self.dims];
+            for (i, byte) in text.bytes().enumerate() {
+                vector[i % self.dims] += byte as f32 / 255.0;
+            }
+            let norm: f32 = vector.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut vector {
+                    *v /= norm;
+                }
+            }
+            Ok(aivyx_llm::Embedding {
+                vector,
+                dimensions: self.dims,
+            })
+        }
+    }
+
+    fn setup_memory_manager() -> (Arc<Mutex<MemoryManager>>, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("aivyx-planner-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("memory.db");
+        let store = MemoryStore::open(&db_path).unwrap();
+        let key = aivyx_crypto::MasterKey::generate();
+        let provider = Arc::new(MockEmbeddingProvider::new(4));
+        let mgr = MemoryManager::new(store, provider, key, 0).unwrap();
+        (Arc::new(Mutex::new(mgr)), dir)
+    }
+
+    #[tokio::test]
+    async fn build_memory_block_empty_manager_returns_empty() {
+        let (mgr, dir) = setup_memory_manager();
+        let block = build_memory_block("test goal", &mgr).await.unwrap();
+        assert!(block.is_empty(), "empty manager should produce empty block");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn build_memory_block_with_memories_formats_correctly() {
+        let (mgr, dir) = setup_memory_manager();
+
+        // Store some memories
+        {
+            let mut m = mgr.lock().await;
+            m.remember(
+                "Rust compilation is fast".into(),
+                MemoryKind::Fact,
+                None,
+                vec![],
+            )
+            .await
+            .unwrap();
+            m.remember(
+                "User prefers verbose output".into(),
+                MemoryKind::Preference,
+                None,
+                vec![],
+            )
+            .await
+            .unwrap();
+        }
+
+        let block = build_memory_block("Rust project", &mgr).await.unwrap();
+        assert!(block.starts_with("[PLANNING MEMORY]"));
+        assert!(block.ends_with("[END PLANNING MEMORY]"));
+        assert!(block.contains("Relevant past experiences:"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn build_memory_block_with_outcomes_includes_stats() {
+        let (mgr, dir) = setup_memory_manager();
+
+        // Record some outcomes
+        {
+            let m = mgr.lock().await;
+            let r1 = OutcomeRecord::new(
+                OutcomeSource::ToolCall {
+                    tool_name: "shell".into(),
+                },
+                true,
+                "success".into(),
+                100,
+                "agent".into(),
+                "goal".into(),
+            );
+            let r2 = OutcomeRecord::new(
+                OutcomeSource::ToolCall {
+                    tool_name: "shell".into(),
+                },
+                false,
+                "failed".into(),
+                200,
+                "agent".into(),
+                "goal".into(),
+            );
+            m.record_outcome(&r1).unwrap();
+            m.record_outcome(&r2).unwrap();
+        }
+
+        let block = build_memory_block("run tests", &mgr).await.unwrap();
+        assert!(block.contains("[PLANNING MEMORY]"));
+        assert!(block.contains("Past tool statistics:"));
+        assert!(block.contains("shell:"));
+        assert!(block.contains("50% success"));
+        assert!(block.contains("2 uses"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn format_memory_kind_returns_correct_strings() {
+        assert_eq!(format_memory_kind(&MemoryKind::Fact), "fact");
+        assert_eq!(format_memory_kind(&MemoryKind::Preference), "preference");
+        assert_eq!(format_memory_kind(&MemoryKind::SessionSummary), "session");
+        assert_eq!(format_memory_kind(&MemoryKind::Procedure), "procedure");
+        assert_eq!(format_memory_kind(&MemoryKind::Decision), "decision");
+        assert_eq!(format_memory_kind(&MemoryKind::Outcome), "outcome");
+        assert_eq!(
+            format_memory_kind(&MemoryKind::Custom("custom".into())),
+            "custom"
+        );
+    }
 
     #[test]
     fn parse_valid_json() {

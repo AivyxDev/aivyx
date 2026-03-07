@@ -62,7 +62,7 @@ jobs:
 
               echo "=== Audit ==="
               cargo install cargo-audit --quiet 2>/dev/null || true
-              cargo audit || echo "⚠ cargo audit found issues (non-blocking)"
+              cargo audit
 
               echo "✓ All checks passed"
             '

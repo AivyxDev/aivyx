@@ -13,6 +13,8 @@ use serde::Deserialize;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Request body for `POST /digest`.
 #[derive(Debug, Deserialize)]
@@ -32,8 +34,10 @@ fn default_agent() -> String {
 /// Returns the generated digest text.
 pub async fn generate_digest(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<DigestRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     // Drain notifications for context
     let mut notification_context = String::new();
     let notif_path = state.dirs.schedules_dir().join("notifications.db");
@@ -78,7 +82,8 @@ pub async fn generate_digest(
             req.agent
         )))
     })?;
-    let provider_config = state.config.resolve_provider(profile.provider.as_deref());
+    let config = state.config.read().await;
+    let provider_config = config.resolve_provider(profile.provider.as_deref());
     let secrets_store = EncryptedStore::open(state.dirs.store_path())?;
     let provider = aivyx_llm::create_provider(provider_config, &secrets_store, &state.master_key)?;
 

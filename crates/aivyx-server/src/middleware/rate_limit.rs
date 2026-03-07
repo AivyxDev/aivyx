@@ -76,6 +76,8 @@ pub async fn rate_limit_llm(
     if let Some(ref limiters) = state.endpoint_rate_limiters {
         let window = state
             .config
+            .read()
+            .await
             .server
             .as_ref()
             .and_then(|s| s.rate_limit.as_ref())
@@ -103,6 +105,8 @@ pub async fn rate_limit_search(
     if let Some(ref limiters) = state.endpoint_rate_limiters {
         let window = state
             .config
+            .read()
+            .await
             .server
             .as_ref()
             .and_then(|s| s.rate_limit.as_ref())
@@ -135,6 +139,8 @@ pub async fn rate_limit_task(
     if let Some(ref limiters) = state.endpoint_rate_limiters {
         let window = state
             .config
+            .read()
+            .await
             .server
             .as_ref()
             .and_then(|s| s.rate_limit.as_ref())

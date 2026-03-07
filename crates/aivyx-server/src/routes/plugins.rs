@@ -19,7 +19,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Response item for plugin listing.
 #[derive(Debug, Serialize)]
@@ -69,9 +71,11 @@ pub struct InstallPluginRequest {
 /// `GET /plugins` — list all installed plugins.
 pub async fn list_plugins(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
-    let summaries: Vec<PluginSummary> = state
-        .config
+    auth.require_role(AivyxRole::Viewer)?;
+    let config = state.config.read().await;
+    let summaries: Vec<PluginSummary> = config
         .plugins
         .iter()
         .map(PluginSummary::from)
@@ -82,16 +86,21 @@ pub async fn list_plugins(
 /// `POST /plugins` — install a new plugin.
 pub async fn install_plugin(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<InstallPluginRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     validate_name(&req.name)?;
 
     // Check for duplicates
-    if state.config.find_plugin(&req.name).is_some() {
-        return Err(ServerError(AivyxError::Config(format!(
-            "plugin '{}' already installed",
-            req.name
-        ))));
+    {
+        let config = state.config.read().await;
+        if config.find_plugin(&req.name).is_some() {
+            return Err(ServerError(AivyxError::Config(format!(
+                "plugin '{}' already installed",
+                req.name
+            ))));
+        }
     }
 
     let version = req.version.unwrap_or_else(|| "0.1.0".into());
@@ -123,6 +132,9 @@ pub async fn install_plugin(
     config.add_plugin(entry.clone());
     config.save(state.dirs.config_path()).map_err(ServerError)?;
 
+    // Hot-reload: update in-memory config
+    *state.config.write().await = config;
+
     // Audit
     if let Err(e) = state.audit_log.append(AuditEvent::PluginInstalled {
         plugin_name: req.name,
@@ -140,8 +152,10 @@ pub async fn install_plugin(
 /// `DELETE /plugins/{name}` — remove an installed plugin.
 pub async fn remove_plugin(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     validate_name(&name)?;
 
     // Load config, remove plugin, save
@@ -155,6 +169,9 @@ pub async fn remove_plugin(
     }
 
     config.save(state.dirs.config_path()).map_err(ServerError)?;
+
+    // Hot-reload: update in-memory config
+    *state.config.write().await = config;
 
     // Audit
     if let Err(e) = state

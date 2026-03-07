@@ -9,6 +9,8 @@ pub mod decompose;
 pub mod delegation;
 pub mod job_tracker;
 pub mod message_bus;
+#[cfg(feature = "memory")]
+pub mod memory_sharing;
 pub mod message_tools;
 pub mod nonagon;
 pub mod runtime;
@@ -21,5 +23,7 @@ pub mod verify;
 pub use config::{DialogueConfig, OrchestrationMode, TeamConfig, TeamMemberConfig};
 pub use delegation::SpecialistPool;
 pub use message_bus::{MessageBus, TeamMessage};
+#[cfg(feature = "memory")]
+pub use memory_sharing::TeamMemoryQueryTool;
 pub use runtime::TeamRuntime;
 pub use session_store::{PersistedTeamSession, TeamSessionMetadata, TeamSessionStore};

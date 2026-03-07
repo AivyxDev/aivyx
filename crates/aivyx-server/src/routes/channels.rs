@@ -18,7 +18,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Summary item for channel listing.
 #[derive(Debug, Serialize)]
@@ -67,7 +69,9 @@ pub struct UpdateChannelRequest {
 /// `GET /channels` -- list all configured channels.
 pub async fn list_channels(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
 
     let channels: Vec<ChannelSummary> = config
@@ -88,8 +92,10 @@ pub async fn list_channels(
 /// `POST /channels` -- create a new channel.
 pub async fn create_channel(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<CreateChannelRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&req.name)?;
 
     let platform = match req.platform.to_lowercase().as_str() {
@@ -127,8 +133,10 @@ pub async fn create_channel(
 /// `GET /channels/{name}` -- get channel details.
 pub async fn get_channel(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
 
     let config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
@@ -149,9 +157,11 @@ pub async fn get_channel(
 /// `PUT /channels/{name}` -- update an existing channel.
 pub async fn update_channel(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
     axum::Json(req): axum::Json<UpdateChannelRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
 
     let mut config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
@@ -188,8 +198,10 @@ pub async fn update_channel(
 /// `DELETE /channels/{name}` -- remove a channel.
 pub async fn delete_channel(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
 
     let mut config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 use crate::validation::validate_secret_name;
 
 /// Response for secret listing.
@@ -28,7 +30,9 @@ pub struct SecretListResponse {
 /// Returns only key names, never actual secret values.
 pub async fn list_secrets(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     let store = EncryptedStore::open(state.dirs.store_path())?;
     let keys = store.list_keys()?;
 
@@ -47,8 +51,10 @@ pub struct SetSecretRequest {
 /// `POST /secrets` — store a new secret (or overwrite an existing one).
 pub async fn set_secret(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<SetSecretRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     validate_secret_name(&req.name)?;
 
     let store = EncryptedStore::open(state.dirs.store_path())?;
@@ -68,8 +74,10 @@ pub async fn set_secret(
 /// `DELETE /secrets/{name}` — delete a secret from the encrypted store.
 pub async fn delete_secret(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Admin)?;
     validate_secret_name(&name)?;
 
     let store = EncryptedStore::open(state.dirs.store_path())?;

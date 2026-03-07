@@ -1,0 +1,136 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/aivyx/aivyx-engine
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account (e.g. for IRSA / workload identity)
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: aivyx.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: aivyx-tls
+  #    hosts:
+  #      - aivyx.local
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+# Environment variables for the aivyx-engine container.
+# All AIVYX_* variables are passed through.
+env:
+  AIVYX_LOG_LEVEL: "info"
+  # AIVYX_DATA_DIR: "/data"
+  # AIVYX_BEARER_TOKEN: ""  # prefer secrets section below
+
+# Inline aivyx.toml configuration.
+# This is mounted as a ConfigMap at /etc/aivyx/aivyx.toml
+config: |
+  [provider]
+  type = "ollama"
+  base_url = "http://ollama:11434"
+  model = "llama3.1"
+
+  [autonomy]
+  default_tier = "supervised"
+
+# Sensitive values stored in a Kubernetes Secret.
+secrets:
+  bearerToken: ""
+  masterKey: ""
+
+# External PostgreSQL connection (for future use).
+postgresql:
+  enabled: false
+  external:
+    url: ""
+
+# External Redis connection (for future use).
+redis:
+  enabled: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ── Horizontal Scaling ──────────────────────────────────────────────
+# Uncomment to enable stateless mode with external state stores.
+#
+# scaling:
+#   statelessMode: true
+#   instanceId: ""  # Auto-generated if empty
+#   sessionAffinity: "consistent_hashing"  # none | consistent_hashing | header_based
+#
+# postgresql:
+#   url: "postgres://aivyx:password@postgres:5432/aivyx"
+#   maxConnections: 20
+#   minConnections: 2
+#
+# redis:
+#   url: "redis://redis:6379/0"
+#   poolSize: 10
+#   ttlSeconds: 3600
+#
+# Ingress session affinity annotation (for header_based strategy):
+# ingress:
+#   annotations:
+#     nginx.ingress.kubernetes.io/upstream-hash-by: "$http_x_aivyx_instance_id"

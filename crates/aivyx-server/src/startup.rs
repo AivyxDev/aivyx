@@ -24,7 +24,7 @@ use crate::routes;
 /// The `/health` endpoint is outside the auth layer. All other routes
 /// require Bearer token authentication via the auth middleware.
 /// Security headers are applied to all responses.
-pub fn build_router(state: Arc<AppState>) -> axum::Router {
+pub async fn build_router(state: Arc<AppState>) -> axum::Router {
     let sidecar_mode = state.sidecar_mode;
 
     // Public routes (no auth required — WebSocket authenticates in-band)
@@ -39,6 +39,19 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/.well-known/agent.json",
             axum::routing::get(routes::a2a::agent_card),
+        )
+        // Inbound webhook triggers — public, secured via HMAC signature
+        .route(
+            "/webhooks/{trigger_name}",
+            axum::routing::post(routes::webhooks::receive_webhook),
+        )
+        // SSO auth endpoints — public (login/logout handle their own auth)
+        .route("/auth/login", axum::routing::post(routes::auth::login))
+        .route("/auth/logout", axum::routing::post(routes::auth::logout))
+        // OpenAPI spec — public, API docs should be accessible without auth
+        .route(
+            "/api/openapi.json",
+            axum::routing::get(routes::openapi::openapi_spec),
         );
 
     // --- Rate-limited tiers (inside auth layer) ---
@@ -54,6 +67,15 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/chat/audio",
             axum::routing::post(routes::chat::audio_chat)
                 .layer(axum::extract::DefaultBodyLimit::max(10_485_760)), // 10 MiB for audio
+        )
+        .route(
+            "/chat/image",
+            axum::routing::post(routes::chat::image_chat)
+                .layer(axum::extract::DefaultBodyLimit::max(20_971_520)), // 20 MiB for images
+        )
+        .route(
+            "/ws/voice",
+            axum::routing::get(routes::ws_voice::voice_handler),
         )
         .route(
             "/teams/{name}/run",
@@ -99,6 +121,8 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         )
         // A2A JSON-RPC 2.0 — task operations via Google A2A protocol
         .route("/a2a", axum::routing::post(routes::a2a::a2a_handler))
+        // A2A SSE streaming — tasks/sendSubscribe
+        .route("/a2a/stream", axum::routing::post(routes::a2a::a2a_stream_handler))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::rate_limit::rate_limit_task,
@@ -148,10 +172,30 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             axum::routing::get(routes::memory::list_triples),
         )
         .route(
+            "/memory/graph",
+            axum::routing::get(routes::memory::graph_full),
+        )
+        .route(
+            "/memory/graph/entity/{name}",
+            axum::routing::get(routes::memory::graph_entity),
+        )
+        .route(
+            "/memory/graph/communities",
+            axum::routing::get(routes::memory::graph_communities),
+        )
+        .route(
+            "/memory/graph/path",
+            axum::routing::get(routes::memory::graph_path),
+        )
+        .route(
             "/memory/profile",
             axum::routing::get(routes::memory::get_profile).put(routes::memory::update_profile),
         )
         .route("/audit", axum::routing::get(routes::audit::recent_audit))
+        .route(
+            "/security/capability-audit",
+            axum::routing::get(routes::security::capability_audit_handler),
+        )
         .route(
             "/audit/verify",
             axum::routing::post(routes::audit::verify_audit),
@@ -232,6 +276,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         )
         .route("/skills", axum::routing::get(routes::skills::list_skills))
         .route(
+            "/skills/effectiveness",
+            axum::routing::get(routes::skills::skill_effectiveness),
+        )
+        .route(
             "/skills/{name}",
             axum::routing::get(routes::skills::get_skill).delete(routes::skills::delete_skill),
         )
@@ -265,6 +313,21 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/admin/rotate-token",
             axum::routing::post(routes::admin::rotate_token),
         )
+        // --- Tenant administration endpoints ---
+        .route("/tenants", axum::routing::get(routes::tenants::list_tenants).post(routes::tenants::create_tenant))
+        .route("/tenants/{id}", axum::routing::get(routes::tenants::get_tenant).delete(routes::tenants::delete_tenant))
+        .route("/tenants/{id}/suspend", axum::routing::post(routes::tenants::suspend_tenant))
+        .route("/tenants/{id}/unsuspend", axum::routing::post(routes::tenants::unsuspend_tenant))
+        .route("/tenants/{id}/keys", axum::routing::get(routes::tenants::list_api_keys).post(routes::tenants::create_api_key))
+        .route("/tenants/{id}/keys/{key_id}", axum::routing::delete(routes::tenants::revoke_api_key))
+        // --- Workflow endpoints ---
+        .route("/workflows", axum::routing::get(routes::workflows::list_workflows).post(routes::workflows::create_workflow))
+        .route("/workflows/{id}", axum::routing::get(routes::workflows::get_workflow))
+        .route("/workflows/{id}/pause", axum::routing::post(routes::workflows::pause_workflow))
+        .route("/workflows/{id}/resume", axum::routing::post(routes::workflows::resume_workflow))
+        // --- Usage / billing endpoints ---
+        .route("/usage", axum::routing::get(routes::usage::usage_summary))
+        .route("/usage/daily", axum::routing::get(routes::usage::usage_daily))
         // --- Federation endpoints ---
         .route(
             "/federation/ping",
@@ -289,23 +352,62 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/federation/search",
             axum::routing::post(routes::federation::federated_search),
-        );
+        )
+        // SSO user info — protected, requires auth
+        .route("/auth/me", axum::routing::get(routes::auth::me));
 
-    // Merge all protected tiers under the auth middleware
-    let protected = llm_routes
+    // Merge all protected tiers under the auth middleware.
+    // Use tenant_auth_middleware when multi-tenancy is enabled, which handles
+    // API key lookup + tenant status checks before falling back to legacy bearer.
+    let merged = llm_routes
         .merge(search_routes)
         .merge(task_routes)
-        .merge(unmetered_routes)
-        .layer(axum::middleware::from_fn_with_state(
+        .merge(unmetered_routes);
+
+    let protected = if state.multi_tenant_enabled {
+        merged.layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            middleware::tenant_auth::tenant_auth_middleware,
+        ))
+    } else {
+        merged.layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::auth::auth_middleware,
-        ));
+        ))
+    };
 
     // Build CORS layer from config (sidecar mode allows localhost origins)
-    let cors = build_cors_layer(&state.config, sidecar_mode);
+    let config_guard = state.config.read().await;
+    let cors = build_cors_layer(&config_guard, sidecar_mode);
+    drop(config_guard);
 
-    public
-        .merge(protected)
+    // --- Chaos fault-injection layer (opt-in via AIVYX_CHAOS_ENABLED=1) ---
+    let chaos_config = Arc::new(middleware::chaos::ChaosConfig {
+        enabled: std::env::var("AIVYX_CHAOS_ENABLED").map_or(false, |v| v == "1"),
+        http_error_probability: std::env::var("AIVYX_CHAOS_HTTP_ERROR_PROB")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0),
+        latency_probability: std::env::var("AIVYX_CHAOS_LATENCY_PROB")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0),
+        latency_ms: std::env::var("AIVYX_CHAOS_LATENCY_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(500),
+        corrupt_body_probability: std::env::var("AIVYX_CHAOS_CORRUPT_PROB")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0),
+    });
+
+    let router = public.merge(protected);
+
+    let mut router = router
+        .layer(axum::middleware::from_fn(
+            middleware::trace_context::trace_context_middleware,
+        ))
         .layer(axum::extract::DefaultBodyLimit::max(1_048_576)) // 1 MiB default
         .layer(axum::middleware::from_fn(
             middleware::security::security_headers,
@@ -333,7 +435,14 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                 }),
         )
         .layer(cors)
-        .with_state(state)
+        .with_state(state);
+
+    if chaos_config.enabled {
+        tracing::warn!("Chaos middleware ENABLED -- faults will be injected");
+        router = router.layer(middleware::chaos::ChaosLayer::new(chaos_config));
+    }
+
+    router
 }
 
 /// Check if an origin is a valid sidecar origin (localhost or Tauri).
@@ -450,6 +559,9 @@ pub fn build_app_state(
     // Build federation client if configured
     let federation = build_federation_client(&dirs, &config)?;
 
+    // Build billing components
+    let (cost_ledger, budget_enforcer) = build_billing(&dirs, &config)?;
+
     let agent_dirs = AivyxDirs::new(dirs.root());
     let agent_config = config.clone();
 
@@ -460,13 +572,19 @@ pub fn build_app_state(
         audit_log,
         master_key: MasterKey::from_bytes([0u8; 32]), // placeholder
         dirs,
-        config,
+        config: Arc::new(tokio::sync::RwLock::new(config)),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation,
         prometheus_handle: None,
+        tenant_store: None,
+        api_key_store: None,
+        multi_tenant_enabled: false,
+        cost_ledger,
+        budget_enforcer,
     };
 
     Ok(Arc::new(state))
@@ -514,6 +632,12 @@ pub fn build_app_state_with_keys(
     // Build federation client if configured
     let federation = build_federation_client(&dirs, &config)?;
 
+    // Initialize tenant stores if multi-tenancy is enabled
+    let (tenant_store, api_key_store, multi_tenant_enabled) = build_tenant_stores(&dirs, &config)?;
+
+    // Build billing components
+    let (cost_ledger, budget_enforcer) = build_billing(&dirs, &config)?;
+
     let state = AppState {
         agent_session: Arc::new(AgentSession::new(agent_dirs, agent_config, agent_key)),
         session_store,
@@ -521,16 +645,55 @@ pub fn build_app_state_with_keys(
         audit_log,
         master_key: store_key,
         dirs,
-        config,
+        config: Arc::new(tokio::sync::RwLock::new(config)),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode,
         endpoint_rate_limiters,
         federation,
         prometheus_handle,
+        tenant_store,
+        api_key_store,
+        multi_tenant_enabled,
+        cost_ledger,
+        budget_enforcer,
     };
 
     Ok(Arc::new(state))
+}
+
+/// Initialize tenant and API key stores when multi-tenancy is enabled.
+fn build_tenant_stores(
+    dirs: &AivyxDirs,
+    config: &AivyxConfig,
+) -> Result<(
+    Option<Arc<aivyx_tenant::TenantStore>>,
+    Option<Arc<aivyx_tenant::ApiKeyStore>>,
+    bool,
+)> {
+    let enabled = config
+        .tenants
+        .as_ref()
+        .is_some_and(|t| t.enabled);
+
+    if !enabled {
+        return Ok((None, None, false));
+    }
+
+    let tenants_dir = dirs.root().join("tenants");
+    std::fs::create_dir_all(&tenants_dir)?;
+
+    let tenant_store = aivyx_tenant::TenantStore::open(tenants_dir.join("tenants.db"))?;
+    let api_key_store = aivyx_tenant::ApiKeyStore::open(tenants_dir.join("apikeys.db"))?;
+
+    tracing::info!("multi-tenancy enabled");
+
+    Ok((
+        Some(Arc::new(tenant_store)),
+        Some(Arc::new(api_key_store)),
+        true,
+    ))
 }
 
 /// Attempt to build a `MemoryManager` if embedding config is present.
@@ -559,6 +722,36 @@ fn build_memory_manager(
     } else {
         Ok(None)
     }
+}
+
+/// Initialize the cost ledger and optional budget enforcer.
+///
+/// The ledger is always created (even in single-user mode) so cost data can
+/// be recorded. The budget enforcer is only created when `config.billing`
+/// is present.
+fn build_billing(
+    dirs: &AivyxDirs,
+    config: &AivyxConfig,
+) -> Result<(Arc<aivyx_billing::CostLedger>, Option<Arc<aivyx_billing::BudgetEnforcer>>)> {
+    let billing_dir = dirs.root().join("billing");
+    std::fs::create_dir_all(&billing_dir)?;
+
+    let ledger = Arc::new(aivyx_billing::CostLedger::open(billing_dir.join("costs.db"))?);
+
+    let enforcer = config.billing.as_ref().map(|billing_cfg| {
+        let budget_config = aivyx_billing::BudgetConfig {
+            agent_daily_usd: billing_cfg.agent_daily_usd,
+            agent_monthly_usd: billing_cfg.agent_monthly_usd,
+            tenant_daily_usd: billing_cfg.tenant_daily_usd,
+            tenant_monthly_usd: billing_cfg.tenant_monthly_usd,
+            on_exceeded: aivyx_billing::BudgetAction::Pause,
+            alert_threshold: billing_cfg.alert_threshold,
+            alert_webhook: billing_cfg.alert_webhook.clone(),
+        };
+        Arc::new(aivyx_billing::BudgetEnforcer::new(ledger.clone(), budget_config))
+    });
+
+    Ok((ledger, enforcer))
 }
 
 /// Attempt to build a `FederationClient` if federation is configured.

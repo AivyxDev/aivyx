@@ -50,7 +50,13 @@ async fn tick(state: &AppState) -> aivyx_core::Result<()> {
             continue;
         }
 
-        tracing::info!("scheduler firing: {} (agent: {})", entry.name, entry.agent);
+        let is_team = entry.team.is_some();
+        tracing::info!(
+            "scheduler firing: {} (agent: {}, team: {})",
+            entry.name,
+            entry.agent,
+            is_team
+        );
 
         // Audit: schedule fired
         let _ = state
@@ -61,8 +67,12 @@ async fn tick(state: &AppState) -> aivyx_core::Result<()> {
                 timestamp: now,
             });
 
-        // Run the agent
-        let result = run_schedule_agent(state, &entry.agent, &entry.prompt).await;
+        // Run as team session or single agent
+        let result = if let Some(ref team_name) = entry.team {
+            run_schedule_team(state, team_name, &entry.agent, &entry.prompt).await
+        } else {
+            run_schedule_agent(state, &entry.agent, &entry.prompt).await
+        };
 
         match &result {
             Ok(response) => {
@@ -144,6 +154,25 @@ async fn run_schedule_agent(
 
     // Run a single turn with no interactive channel (background execution)
     agent.turn(prompt, None).await
+}
+
+/// Run a scheduled team session and return the lead agent's response.
+async fn run_schedule_team(
+    state: &AppState,
+    team_name: &str,
+    _agent_name: &str,
+    prompt: &str,
+) -> aivyx_core::Result<String> {
+    let dirs = aivyx_config::AivyxDirs::new(state.dirs.root());
+    let key_bytes: [u8; 32] = state.master_key.expose_secret()[..32]
+        .try_into()
+        .map_err(|_| aivyx_core::AivyxError::Crypto("invalid master key length".into()))?;
+    let mk = MasterKey::from_bytes(key_bytes);
+    let config = state.config.read().await.clone();
+    let session = aivyx_agent::AgentSession::new(dirs, config, mk);
+    let dirs2 = aivyx_config::AivyxDirs::new(state.dirs.root());
+    let runtime = aivyx_team::TeamRuntime::load(team_name, &dirs2, session)?;
+    runtime.run(prompt, None).await
 }
 
 /// Store an agent response as a notification.

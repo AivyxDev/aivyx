@@ -743,6 +743,8 @@ fn task_store_data_isolation_across_keys() {
         retries: 0,
         started_at: None,
         completed_at: None,
+        depends_on: vec![],
+        kind: aivyx_task::StepKind::default(),
     }];
     store.save(&mission, &key1).unwrap();
 
@@ -1040,6 +1042,8 @@ fn task_store_full_lifecycle() {
                     retries: 0,
                     started_at: None,
                     completed_at: None,
+                    depends_on: vec![],
+                    kind: aivyx_task::StepKind::default(),
                 })
                 .collect();
             m
@@ -1504,6 +1508,11 @@ async fn server_path_traversal_prevention() {
     hasher.update(token.as_bytes());
     let bearer_token_hash: [u8; 32] = hasher.finalize().into();
 
+    std::fs::create_dir_all(dir.join("billing")).unwrap();
+    let cost_ledger = Arc::new(
+        aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap(),
+    );
+
     let agent_dirs = AivyxDirs::new(&dir);
     let state = Arc::new(AppState {
         agent_session: Arc::new(AgentSession::new(agent_dirs, config.clone(), agent_key)),
@@ -1512,13 +1521,19 @@ async fn server_path_traversal_prevention() {
         audit_log,
         master_key,
         dirs,
-        config,
+        config: Arc::new(tokio::sync::RwLock::new(config)),
+        push_notification_configs: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         bearer_token_hash: tokio::sync::RwLock::new(bearer_token_hash),
         auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation: None,
         prometheus_handle: None,
+        tenant_store: None,
+        api_key_store: None,
+        multi_tenant_enabled: false,
+        cost_ledger,
+        budget_enforcer: None,
     });
 
     // Test path traversal attempts
@@ -1529,7 +1544,7 @@ async fn server_path_traversal_prevention() {
     ];
 
     for path in &traversal_names {
-        let router = build_router(state.clone());
+        let router = build_router(state.clone()).await;
         let req = Request::builder()
             .uri(*path)
             .header("authorization", format!("Bearer {token}"))

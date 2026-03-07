@@ -11,6 +11,8 @@ use serde::Serialize;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Response body for `GET /status`.
 #[derive(Debug, Serialize)]
@@ -72,9 +74,13 @@ pub struct PeerHealthInfo {
 /// `GET /status` — system summary.
 pub async fn system_status(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
-    let provider = format!("{:?}", state.config.provider);
-    let tier = format!("{:?}", state.config.autonomy.default_tier);
+    auth.require_role(AivyxRole::Viewer)?;
+    let config = state.config.read().await;
+    let provider = format!("{:?}", config.provider);
+    let tier = format!("{:?}", config.autonomy.default_tier);
+    drop(config);
 
     let agent_count = count_toml_files(&state.dirs.agents_dir());
     let team_count = count_toml_files(&state.dirs.teams_dir());

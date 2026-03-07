@@ -11,11 +11,15 @@ use axum::response::IntoResponse;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// `GET /sessions` — list all saved sessions with metadata.
 pub async fn list_sessions(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let sessions = state.session_store.list(&state.master_key)?;
     Ok(axum::Json(sessions))
 }
@@ -23,8 +27,10 @@ pub async fn list_sessions(
 /// `DELETE /sessions/:id` — delete a saved session.
 pub async fn delete_session(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let session_id: SessionId = id
         .parse()
         .map_err(|_| ServerError(AivyxError::Config(format!("invalid session ID: {id}"))))?;

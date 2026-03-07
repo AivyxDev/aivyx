@@ -66,6 +66,19 @@ impl MessageBus {
         }
     }
 
+    /// Remove an agent from the bus (for ephemeral agent cleanup).
+    ///
+    /// After deregistration the agent can no longer receive messages.
+    /// Existing receivers will observe the channel as closed once all
+    /// senders are dropped.
+    pub fn deregister_agent(&self, name: &str) -> Result<()> {
+        let mut senders = self.senders.write().map_err(|e| {
+            aivyx_core::AivyxError::Agent(format!("message bus lock poisoned: {e}"))
+        })?;
+        senders.remove(name);
+        Ok(())
+    }
+
     /// Send a message to a specific agent.
     pub fn send(&self, msg: TeamMessage) -> Result<()> {
         let senders = self.senders.read().map_err(|e| {
@@ -237,6 +250,29 @@ mod tests {
         let _rx = bus.register_agent("alice").unwrap();
         // Original subscribe still works too
         assert!(bus.subscribe("alice").is_some());
+    }
+
+    #[tokio::test]
+    async fn deregister_agent_removes_channel() {
+        let names = vec!["alice".into(), "bob".into()];
+        let bus = MessageBus::new(&names);
+
+        // Bob exists
+        assert!(bus.subscribe("bob").is_some());
+
+        // Deregister bob
+        bus.deregister_agent("bob").unwrap();
+
+        // Bob is gone — subscribe returns None, send returns error
+        assert!(bus.subscribe("bob").is_none());
+        let msg = TeamMessage {
+            from: "alice".into(),
+            to: "bob".into(),
+            content: "hello".into(),
+            message_type: "text".into(),
+            timestamp: Utc::now(),
+        };
+        assert!(bus.send(msg).is_err());
     }
 
     #[tokio::test]

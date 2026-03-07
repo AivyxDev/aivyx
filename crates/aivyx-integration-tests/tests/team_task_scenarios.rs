@@ -49,6 +49,8 @@ fn make_step(index: usize, description: &str) -> Step {
         retries: 0,
         started_at: None,
         completed_at: None,
+        depends_on: vec![],
+        kind: aivyx_task::StepKind::default(),
     }
 }
 
@@ -63,6 +65,8 @@ fn make_completed_step(index: usize, description: &str, result: &str) -> Step {
         retries: 0,
         started_at: Some(Utc::now()),
         completed_at: Some(Utc::now()),
+        depends_on: vec![],
+        kind: aivyx_task::StepKind::default(),
     }
 }
 

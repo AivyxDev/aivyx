@@ -6,12 +6,18 @@
 //! OpenAI-compatible format.
 
 pub mod app_state;
+pub mod auth;
+pub mod backup;
 pub mod channels;
 pub mod error;
+pub mod extractors;
 pub mod middleware;
 pub mod routes;
+pub mod scaling;
 pub mod scheduler;
+pub mod security;
 pub mod startup;
+pub mod task_recovery;
 pub mod transcription;
 pub mod validation;
 

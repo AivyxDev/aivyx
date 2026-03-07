@@ -5,14 +5,16 @@
 //! between steps, and supporting resume after crashes.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use aivyx_agent::AgentSession;
 use aivyx_audit::{AuditEvent, AuditLog};
 use aivyx_core::{AivyxError, ChannelAdapter, Result, TaskId};
 use aivyx_crypto::{EncryptedStore, MasterKey};
 use aivyx_llm::create_provider;
+use aivyx_memory::{MemoryManager, OutcomeRecord, OutcomeSource};
 use chrono::Utc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinSet;
 use tracing;
 
@@ -35,6 +37,8 @@ pub struct TaskEngine {
     task_key: MasterKey,
     /// Optional audit log for lifecycle events.
     audit_log: Option<AuditLog>,
+    /// Optional memory manager for recording execution outcomes.
+    memory_manager: Option<Arc<Mutex<MemoryManager>>>,
 }
 
 impl TaskEngine {
@@ -50,7 +54,17 @@ impl TaskEngine {
             store,
             task_key,
             audit_log,
+            memory_manager: None,
         }
+    }
+
+    /// Attach a memory manager for outcome tracking.
+    ///
+    /// When set, the engine records an [`OutcomeRecord`] for each completed
+    /// or failed mission step, feeding the planner feedback loop.
+    pub fn with_memory_manager(mut self, manager: Arc<Mutex<MemoryManager>>) -> Self {
+        self.memory_manager = Some(manager);
+        self
     }
 
     /// Create and plan a new mission from a goal string. Returns the task ID.
@@ -73,8 +87,12 @@ impl TaskEngine {
             self.session.master_key(),
         )?;
 
-        // Plan the mission via LLM
-        let steps = planner::plan_mission(provider.as_ref(), goal, 4096).await?;
+        // Plan the mission via LLM, using memory context when available
+        let steps = if let Some(ref mgr) = self.memory_manager {
+            planner::plan_mission_with_memory(provider.as_ref(), goal, 4096, mgr).await?
+        } else {
+            planner::plan_mission(provider.as_ref(), goal, 4096).await?
+        };
 
         mission.steps = steps;
         mission.status = TaskStatus::Planned;
@@ -213,9 +231,12 @@ impl TaskEngine {
                     .await;
             }
 
-            // Execute the step
+            // Execute the step with timing for outcome tracking
+            let step_start = Instant::now();
             match agent.turn(&step_prompt, channel).await {
                 Ok(result) => {
+                    let step_elapsed = step_start.elapsed().as_millis() as u64;
+
                     // For Reflect steps, parse the verdict
                     if let StepKind::Reflect {
                         target_step,
@@ -307,15 +328,28 @@ impl TaskEngine {
                                 task_id: mission.id,
                                 step_index: step_idx,
                                 success: true,
-                                result_summary: summary,
+                                result_summary: summary.clone(),
                                 timestamp: Utc::now(),
                             })
                             .await;
                     }
+
+                    // Record step outcome for planner feedback
+                    self.record_step_outcome(
+                        mission.id,
+                        step_idx,
+                        true,
+                        &summary,
+                        step_elapsed,
+                        &mission.agent_name,
+                        &mission.goal,
+                    )
+                    .await;
                 }
                 Err(e) => {
+                    let step_elapsed = step_start.elapsed().as_millis() as u64;
                     if self
-                        .handle_step_failure(mission, step_idx, &step_desc, &e, progress)
+                        .handle_step_failure(mission, step_idx, &step_desc, &e, progress, step_elapsed)
                         .await?
                     {
                         return Ok(());
@@ -385,7 +419,8 @@ impl TaskEngine {
             self.store.save(mission, &self.task_key)?;
 
             // Spawn each ready step concurrently with its own agent
-            let mut join_set: JoinSet<(usize, String, std::result::Result<String, AivyxError>)> =
+            // Tuple: (step_idx, step_desc, result, duration_ms)
+            let mut join_set: JoinSet<(usize, String, std::result::Result<String, AivyxError>, u64)> =
                 JoinSet::new();
 
             for (step_idx, step_prompt, step_desc) in step_prompts {
@@ -393,18 +428,23 @@ impl TaskEngine {
                 let agent_name = mission.agent_name.clone();
 
                 join_set.spawn(async move {
+                    let dag_step_start = Instant::now();
                     let mut agent = match session.create_agent(&agent_name).await {
                         Ok(a) => a,
-                        Err(e) => return (step_idx, step_desc, Err(e)),
+                        Err(e) => {
+                            let elapsed = dag_step_start.elapsed().as_millis() as u64;
+                            return (step_idx, step_desc, Err(e), elapsed);
+                        }
                     };
                     let result = agent.turn(&step_prompt, None).await;
-                    (step_idx, step_desc, result)
+                    let elapsed = dag_step_start.elapsed().as_millis() as u64;
+                    (step_idx, step_desc, result, elapsed)
                 });
             }
 
             // Collect results
             while let Some(join_result) = join_set.join_next().await {
-                let (step_idx, step_desc, outcome) = match join_result {
+                let (step_idx, step_desc, outcome, step_duration_ms) = match join_result {
                     Ok(r) => r,
                     Err(e) => {
                         // JoinError — task panicked
@@ -433,11 +473,22 @@ impl TaskEngine {
                                     task_id: mission.id,
                                     step_index: step_idx,
                                     success: true,
-                                    result_summary: summary,
+                                    result_summary: summary.clone(),
                                     timestamp: Utc::now(),
                                 })
                                 .await;
                         }
+
+                        self.record_step_outcome(
+                            mission.id,
+                            step_idx,
+                            true,
+                            &summary,
+                            step_duration_ms,
+                            &mission.agent_name,
+                            &mission.goal,
+                        )
+                        .await;
                     }
                     Err(e) => {
                         mission.steps[step_idx].retries += 1;
@@ -465,11 +516,22 @@ impl TaskEngine {
                                         task_id: mission.id,
                                         step_index: step_idx,
                                         success: false,
-                                        result_summary: reason,
+                                        result_summary: reason.clone(),
                                         timestamp: Utc::now(),
                                     })
                                     .await;
                             }
+
+                            self.record_step_outcome(
+                                mission.id,
+                                step_idx,
+                                false,
+                                &reason,
+                                step_duration_ms,
+                                &mission.agent_name,
+                                &mission.goal,
+                            )
+                            .await;
                         } else {
                             tracing::warn!(
                                 "DAG step {step_idx} failed (attempt {retries}/{max}): {e}",
@@ -678,6 +740,7 @@ impl TaskEngine {
         step_desc: &str,
         error: &AivyxError,
         progress: Option<&DynProgressSink>,
+        duration_ms: u64,
     ) -> Result<bool> {
         mission.steps[step_idx].retries += 1;
         let retries = mission.steps[step_idx].retries;
@@ -712,7 +775,7 @@ impl TaskEngine {
                         task_id: mission.id,
                         step_index: step_idx,
                         success: false,
-                        result_summary: reason,
+                        result_summary: reason.clone(),
                         timestamp: Utc::now(),
                     })
                     .await;
@@ -724,6 +787,18 @@ impl TaskEngine {
                     })
                     .await;
             }
+
+            // Record failed step outcome
+            self.record_step_outcome(
+                mission.id,
+                step_idx,
+                false,
+                &reason,
+                duration_ms,
+                &mission.agent_name,
+                &mission.goal,
+            )
+            .await;
 
             return Ok(true);
         }
@@ -737,6 +812,37 @@ impl TaskEngine {
         self.store.save(mission, &self.task_key)?;
 
         Ok(false)
+    }
+
+    /// Record a step outcome if a memory manager is attached.
+    async fn record_step_outcome(
+        &self,
+        task_id: TaskId,
+        step_index: usize,
+        success: bool,
+        result_summary: &str,
+        duration_ms: u64,
+        agent_name: &str,
+        goal: &str,
+    ) {
+        if let Some(ref mgr) = self.memory_manager {
+            let record = OutcomeRecord::new(
+                OutcomeSource::MissionStep {
+                    task_id,
+                    step_index,
+                },
+                success,
+                result_summary.to_string(),
+                duration_ms,
+                agent_name.to_string(),
+                goal.to_string(),
+            );
+            if let Ok(mgr) = mgr.try_lock() {
+                if let Err(e) = mgr.record_outcome(&record) {
+                    tracing::warn!("Failed to record step outcome: {e}");
+                }
+            }
+        }
     }
 
     /// Finalize a successfully completed mission.
@@ -820,11 +926,13 @@ impl TaskEngine {
                     .await;
             }
 
+            let stream_step_start = Instant::now();
             match agent
                 .turn_stream(&step_prompt, channel, token_tx.clone(), None)
                 .await
             {
                 Ok(result) => {
+                    let stream_elapsed = stream_step_start.elapsed().as_millis() as u64;
                     let summary = truncate(&result, 500);
                     mission.steps[step_idx].status = StepStatus::Completed;
                     mission.steps[step_idx].result = Some(result);
@@ -838,17 +946,30 @@ impl TaskEngine {
                                 task_id: mission.id,
                                 step_index: step_idx,
                                 success: true,
-                                result_summary: summary,
+                                result_summary: summary.clone(),
                                 timestamp: Utc::now(),
                             })
                             .await;
                     }
+
+                    self.record_step_outcome(
+                        mission.id,
+                        step_idx,
+                        true,
+                        &summary,
+                        stream_elapsed,
+                        &mission.agent_name,
+                        &mission.goal,
+                    )
+                    .await;
                 }
                 Err(e) => {
+                    let stream_elapsed = stream_step_start.elapsed().as_millis() as u64;
                     mission.steps[step_idx].retries += 1;
                     if mission.steps[step_idx].retries > mission.max_step_retries {
+                        let reason = format!("{e}");
                         mission.steps[step_idx].status = StepStatus::Failed {
-                            reason: format!("{e}"),
+                            reason: reason.clone(),
                         };
                         mission.status = TaskStatus::Failed {
                             reason: format!("step {step_idx} failed: {e}"),
@@ -865,6 +986,18 @@ impl TaskEngine {
                                 })
                                 .await;
                         }
+
+                        self.record_step_outcome(
+                            mission.id,
+                            step_idx,
+                            false,
+                            &reason,
+                            stream_elapsed,
+                            &mission.agent_name,
+                            &mission.goal,
+                        )
+                        .await;
+
                         return Ok(mission);
                     }
 
@@ -1111,7 +1244,7 @@ fn parse_reflection_result(response: &str) -> Result<ReflectionVerdict> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Step, StepStatus};
+    use crate::types::{Step, StepKind, StepStatus};
 
     #[test]
     fn build_step_prompt_includes_goal_and_step() {
@@ -1151,6 +1284,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -1162,6 +1297,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
 
@@ -1228,6 +1365,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 1,
@@ -1239,6 +1378,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
             Step {
                 index: 2,
@@ -1250,6 +1391,8 @@ mod tests {
                 retries: 0,
                 started_at: None,
                 completed_at: None,
+                depends_on: vec![],
+                kind: StepKind::default(),
             },
         ];
         store.save(&mission, &key).unwrap();

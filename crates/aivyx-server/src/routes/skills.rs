@@ -3,6 +3,7 @@
 //! `GET /skills` — list installed skills.
 //! `GET /skills/{name}` — get full skill details.
 //! `DELETE /skills/{name}` — remove an installed skill.
+//! `GET /skills/effectiveness` — skill effectiveness scores from outcome history.
 
 use std::sync::Arc;
 
@@ -13,7 +14,9 @@ use serde::Serialize;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Summary item for skill listing.
 #[derive(Debug, Serialize)]
@@ -48,7 +51,9 @@ pub struct SkillDetailResponse {
 /// `GET /skills` — list installed skills.
 pub async fn list_skills(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let skills_dir = state.dirs.skills_dir();
 
     let summaries = if skills_dir.exists() {
@@ -71,8 +76,10 @@ pub async fn list_skills(
 /// `GET /skills/{name}` — get full skill details.
 pub async fn get_skill(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     validate_name(&name)?;
 
     let skill_path = state.dirs.skills_dir().join(&name).join("SKILL.md");
@@ -99,8 +106,10 @@ pub async fn get_skill(
 /// `DELETE /skills/{name}` — remove an installed skill.
 pub async fn delete_skill(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
 
     let skill_dir = state.dirs.skills_dir().join(&name);
@@ -113,6 +122,29 @@ pub async fn delete_skill(
     std::fs::remove_dir_all(&skill_dir)?;
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `GET /skills/effectiveness` — skill effectiveness scores from outcome history.
+pub async fn skill_effectiveness(
+    State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
+) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
+
+    let mgr = state.memory_manager.as_ref().ok_or_else(|| {
+        ServerError(aivyx_core::AivyxError::Config(
+            "memory manager not configured".into(),
+        ))
+    })?;
+
+    let outcomes = {
+        let guard = mgr.lock().await;
+        guard.query_outcomes(&aivyx_memory::OutcomeFilter::default())?
+    };
+
+    let scores = aivyx_task::skill_scoring::score_skills(&outcomes);
+
+    Ok(axum::Json(scores))
 }
 
 #[cfg(test)]

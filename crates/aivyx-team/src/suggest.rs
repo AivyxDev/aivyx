@@ -4,6 +4,7 @@
 //! for a task by matching required tools, capabilities, and skills against
 //! each team member's profile. Scoring is deterministic — no LLM call needed.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -28,6 +29,106 @@ pub struct MemberProfile {
     pub capability_scopes: Vec<String>,
 }
 
+/// Historical success data that modifies specialist suggestion scores.
+#[derive(Debug, Clone, Default)]
+pub struct LearnedWeights {
+    /// Per-agent success rates from past outcomes.
+    pub agent_success_rates: HashMap<String, f64>,
+    /// Per-tool success rates.
+    pub tool_success_rates: HashMap<String, f64>,
+    /// Per-role success rates.
+    pub role_success_rates: HashMap<String, f64>,
+}
+
+impl LearnedWeights {
+    /// Build learned weights from a set of outcome records.
+    #[cfg(feature = "memory")]
+    pub fn from_outcomes(outcomes: &[aivyx_memory::OutcomeRecord]) -> Self {
+        let mut agent_stats: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut tool_stats: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut role_stats: HashMap<String, (usize, usize)> = HashMap::new();
+
+        for outcome in outcomes {
+            // Agent stats
+            let entry = agent_stats
+                .entry(outcome.agent_name.clone())
+                .or_insert((0, 0));
+            entry.0 += 1;
+            if outcome.success {
+                entry.1 += 1;
+            }
+
+            // Tool stats
+            for tool in &outcome.tools_used {
+                let entry = tool_stats.entry(tool.clone()).or_insert((0, 0));
+                entry.0 += 1;
+                if outcome.success {
+                    entry.1 += 1;
+                }
+            }
+
+            // Role stats
+            if let Some(ref role) = outcome.agent_role {
+                let entry = role_stats.entry(role.clone()).or_insert((0, 0));
+                entry.0 += 1;
+                if outcome.success {
+                    entry.1 += 1;
+                }
+            }
+        }
+
+        let to_rates =
+            |stats: HashMap<String, (usize, usize)>| -> HashMap<String, f64> {
+                stats
+                    .into_iter()
+                    .map(|(k, (total, successes))| (k, successes as f64 / total as f64))
+                    .collect()
+            };
+
+        Self {
+            agent_success_rates: to_rates(agent_stats),
+            tool_success_rates: to_rates(tool_stats),
+            role_success_rates: to_rates(role_stats),
+        }
+    }
+
+    /// Compute a bonus score for a member based on historical data.
+    /// Returns 0-5 based on the member's historical success rate.
+    pub fn bonus_for(&self, member: &MemberProfile) -> usize {
+        let mut bonus = 0usize;
+
+        // Check agent success rate
+        if let Some(&rate) = self.agent_success_rates.get(&member.name) {
+            if rate > 0.8 {
+                bonus += 2;
+            } else if rate > 0.6 {
+                bonus += 1;
+            }
+        }
+
+        // Check tool success rates for member's tools (cap at 1 bonus from tools)
+        for tool in &member.tool_ids {
+            if let Some(&rate) = self.tool_success_rates.get(tool) {
+                if rate > 0.9 {
+                    bonus += 1;
+                    break;
+                }
+            }
+        }
+
+        // Check role success rate
+        if let Some(&rate) = self.role_success_rates.get(&member.role) {
+            if rate > 0.8 {
+                bonus += 2;
+            } else if rate > 0.6 {
+                bonus += 1;
+            }
+        }
+
+        bonus.min(5) // cap total bonus
+    }
+}
+
 /// Scoring weights for specialist matching.
 const TOOL_MATCH_WEIGHT: usize = 3;
 const CAPABILITY_MATCH_WEIGHT: usize = 2;
@@ -43,6 +144,8 @@ pub struct SuggestSpecialistTool {
     id: ToolId,
     /// Team member profiles with their tools, skills, and capabilities.
     members: Vec<MemberProfile>,
+    /// Optional learned weights from outcome history.
+    learned_weights: Option<LearnedWeights>,
 }
 
 impl SuggestSpecialistTool {
@@ -51,7 +154,14 @@ impl SuggestSpecialistTool {
         Self {
             id: ToolId::new(),
             members,
+            learned_weights: None,
         }
+    }
+
+    /// Attach learned weights to boost specialist scores based on outcome history.
+    pub fn with_learned_weights(mut self, weights: LearnedWeights) -> Self {
+        self.learned_weights = Some(weights);
+        self
     }
 }
 
@@ -117,13 +227,16 @@ impl Tool for SuggestSpecialistTool {
             .members
             .iter()
             .map(|m| {
-                let score = score_member(
+                let mut score = score_member(
                     m,
                     &required_tools,
                     &required_capabilities,
                     &required_skills,
                     &keywords,
                 );
+                if let Some(ref weights) = self.learned_weights {
+                    score = score.saturating_add(weights.bonus_for(m));
+                }
                 (score, m)
             })
             .filter(|(score, _)| *score > 0)
@@ -648,5 +761,107 @@ mod tests {
             &["Shell"]
         );
         assert_eq!(coder["matched_skills"].as_array().unwrap(), &["coding"]);
+    }
+
+    #[cfg(feature = "memory")]
+    #[test]
+    fn learned_weights_from_outcomes() {
+        use aivyx_core::TaskId;
+        use aivyx_memory::{OutcomeRecord, OutcomeSource};
+
+        let outcomes = vec![
+            OutcomeRecord::new(
+                OutcomeSource::MissionStep {
+                    task_id: TaskId::new(),
+                    step_index: 0,
+                },
+                true,
+                "ok".into(),
+                100,
+                "coder".into(),
+                "goal".into(),
+            )
+            .with_role("Coder")
+            .with_tools(vec!["shell".into()]),
+            OutcomeRecord::new(
+                OutcomeSource::MissionStep {
+                    task_id: TaskId::new(),
+                    step_index: 0,
+                },
+                false,
+                "fail".into(),
+                200,
+                "coder".into(),
+                "goal".into(),
+            )
+            .with_role("Coder")
+            .with_tools(vec!["shell".into()]),
+        ];
+
+        let weights = LearnedWeights::from_outcomes(&outcomes);
+
+        // coder: 1/2 = 0.5
+        assert!((weights.agent_success_rates["coder"] - 0.5).abs() < 0.01);
+        // shell: 1/2 = 0.5
+        assert!((weights.tool_success_rates["shell"] - 0.5).abs() < 0.01);
+        // Coder role: 1/2 = 0.5
+        assert!((weights.role_success_rates["Coder"] - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn learned_weights_bonus_for() {
+        let mut agent_rates = HashMap::new();
+        agent_rates.insert("coder".into(), 0.9); // > 0.8 => +2
+        let mut tool_rates = HashMap::new();
+        tool_rates.insert("shell".into(), 0.95); // > 0.9 => +1
+        let mut role_rates = HashMap::new();
+        role_rates.insert("Coder".into(), 0.7); // > 0.6 => +1
+
+        let weights = LearnedWeights {
+            agent_success_rates: agent_rates,
+            tool_success_rates: tool_rates,
+            role_success_rates: role_rates,
+        };
+
+        let members = sample_members();
+        let coder = &members[0];
+        // 2 (agent) + 1 (tool) + 1 (role) = 4
+        assert_eq!(weights.bonus_for(coder), 4);
+
+        // Writer has no matching rates => 0
+        let writer = &members[2];
+        assert_eq!(weights.bonus_for(writer), 0);
+    }
+
+    #[tokio::test]
+    async fn suggest_with_learned_weights() {
+        let members = sample_members();
+        let mut agent_rates = HashMap::new();
+        // Give writer a high agent success rate
+        agent_rates.insert("writer".into(), 0.95);
+        let weights = LearnedWeights {
+            agent_success_rates: agent_rates,
+            tool_success_rates: HashMap::new(),
+            role_success_rates: HashMap::new(),
+        };
+
+        let tool = SuggestSpecialistTool::new(members).with_learned_weights(weights);
+
+        // Request file_write — both coder and writer have it
+        let result = tool
+            .execute(serde_json::json!({
+                "required_tools": ["file_write"]
+            }))
+            .await
+            .unwrap();
+
+        let suggestions = result["suggestions"].as_array().unwrap();
+        assert!(suggestions.len() >= 2);
+
+        // Writer gets base score 3 (tool match) + 2 (agent bonus) = 5
+        // Coder gets base score 3 (tool match) + 0 = 3
+        let writer = suggestions.iter().find(|s| s["name"] == "writer").unwrap();
+        let coder = suggestions.iter().find(|s| s["name"] == "coder").unwrap();
+        assert!(writer["score"].as_u64().unwrap() > coder["score"].as_u64().unwrap());
     }
 }

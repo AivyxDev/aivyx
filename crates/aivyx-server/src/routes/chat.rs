@@ -1,8 +1,9 @@
 //! Chat endpoints for agent conversation.
 //!
-//! `POST /chat` — synchronous single-turn chat with an agent.
-//! `POST /chat/stream` — SSE streaming variant with OpenAI-compatible format.
+//! `POST /chat` — synchronous single-turn chat with an agent (supports images).
+//! `POST /chat/stream` — SSE streaming variant with OpenAI-compatible format (supports images).
 //! `POST /chat/audio` — multipart audio upload, transcription, and chat.
+//! `POST /chat/image` — multipart image upload and chat (vision input).
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -16,8 +17,21 @@ use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::ReceiverStream;
 
+use aivyx_llm::{Content, ImageSource};
+
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
+
+/// Base64-encoded image input for multimodal chat.
+#[derive(Debug, Deserialize)]
+pub struct ImageInput {
+    /// MIME type (e.g., "image/png", "image/jpeg").
+    pub media_type: String,
+    /// Base64-encoded image data.
+    pub data: String,
+}
 
 /// Request body for `POST /chat`.
 #[derive(Debug, Deserialize)]
@@ -26,6 +40,9 @@ pub struct ChatRequest {
     pub agent: String,
     /// The user's message.
     pub message: String,
+    /// Optional images to include with the message (vision input).
+    #[serde(default)]
+    pub images: Vec<ImageInput>,
     /// Optional session ID to resume a previous conversation.
     pub session_id: Option<String>,
     /// Optional project name to scope the agent's context.
@@ -46,8 +63,10 @@ pub struct ChatResponse {
 /// `POST /chat` — run a single agent turn and return the response.
 pub async fn chat(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<ChatRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let mut agent = state
         .agent_session
         .create_agent(&req.agent)
@@ -64,8 +83,9 @@ pub async fn chat(
     reject_non_autonomous(&agent)?;
 
     // Set active project if specified
+    let config = state.config.read().await;
     if let Some(ref project_name) = req.project
-        && let Some(project) = state.config.find_project(project_name)
+        && let Some(project) = config.find_project(project_name)
     {
         agent.set_active_project(project.clone());
     }
@@ -78,11 +98,12 @@ pub async fn chat(
         if let Some(persisted) = state.session_store.load(
             &session_id,
             &state.master_key,
-            state.config.memory.session_max_age_hours,
+            config.memory.session_max_age_hours,
         )? {
             agent.restore_conversation(persisted.messages);
         }
     }
+    drop(config);
 
     // Wire memory manager if available
     if let Some(ref mm) = state.memory_manager {
@@ -90,7 +111,13 @@ pub async fn chat(
     }
 
     // Run the turn (no channel adapter — Trust/Free tier only)
-    let response = agent.turn(&req.message, None).await?;
+    let response = if req.images.is_empty() {
+        agent.turn(&req.message, None).await?
+    } else {
+        agent
+            .turn_with_content(build_multimodal_content(&req.message, &req.images), None)
+            .await?
+    };
 
     // Save session
     let persisted = agent.to_persisted_session();
@@ -114,8 +141,10 @@ pub async fn chat(
 /// - `data: {"type":"error","message":"..."}` — on error
 pub async fn stream_chat(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<ChatRequest>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let mut agent = state
         .agent_session
         .create_agent(&req.agent)
@@ -131,8 +160,9 @@ pub async fn stream_chat(
     reject_non_autonomous(&agent)?;
 
     // Set active project if specified
+    let config = state.config.read().await;
     if let Some(ref project_name) = req.project
-        && let Some(project) = state.config.find_project(project_name)
+        && let Some(project) = config.find_project(project_name)
     {
         agent.set_active_project(project.clone());
     }
@@ -145,11 +175,12 @@ pub async fn stream_chat(
         if let Some(persisted) = state.session_store.load(
             &session_id,
             &state.master_key,
-            state.config.memory.session_max_age_hours,
+            config.memory.session_max_age_hours,
         )? {
             agent.restore_conversation(persisted.messages);
         }
     }
+    drop(config);
 
     // Wire memory manager if available
     if let Some(ref mm) = state.memory_manager {
@@ -163,6 +194,7 @@ pub async fn stream_chat(
     let (sse_tx, sse_rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
 
     let message = req.message.clone();
+    let images = req.images;
     let state_clone = state.clone();
 
     // Spawn the agent turn in a background task
@@ -185,8 +217,20 @@ pub async fn stream_chat(
             accumulated
         });
 
-        // Run the agent turn
-        match agent.turn_stream(&message, None, token_tx, None).await {
+        // Run the agent turn (with images if present)
+        let turn_result = if images.is_empty() {
+            agent.turn_stream(&message, None, token_tx, None).await
+        } else {
+            agent
+                .turn_stream_with_content(
+                    build_multimodal_content(&message, &images),
+                    None,
+                    token_tx,
+                    None,
+                )
+                .await
+        };
+        match turn_result {
             Ok(response) => {
                 // Wait for forwarder to finish
                 let _ = forwarder.await;
@@ -260,14 +304,19 @@ pub struct AudioChatResponse {
 /// - `project` (optional): project context
 pub async fn audio_chat(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     mut multipart: axum::extract::Multipart,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     // Check that speech is configured
-    let speech_config = state.config.speech.as_ref().ok_or_else(|| {
-        ServerError(AivyxError::Config(
-            "speech not configured — add [speech] section to config.toml".into(),
-        ))
-    })?;
+    let speech_config = {
+        let config = state.config.read().await;
+        config.speech.clone().ok_or_else(|| {
+            ServerError(AivyxError::Config(
+                "speech not configured — add [speech] section to config.toml".into(),
+            ))
+        })?
+    };
 
     // Parse multipart fields
     let mut audio_bytes: Option<Vec<u8>> = None;
@@ -334,7 +383,7 @@ pub async fn audio_chat(
 
     // Transcribe
     let result = crate::transcription::transcribe(
-        speech_config,
+        &speech_config,
         audio_bytes,
         &audio_filename,
         &state.master_key,
@@ -369,8 +418,9 @@ pub async fn audio_chat(
     reject_non_autonomous(&agent)?;
 
     // Set active project if specified
+    let app_config = state.config.read().await;
     if let Some(ref project_name) = project
-        && let Some(proj) = state.config.find_project(project_name)
+        && let Some(proj) = app_config.find_project(project_name)
     {
         agent.set_active_project(proj.clone());
     }
@@ -383,11 +433,12 @@ pub async fn audio_chat(
         if let Some(persisted) = state.session_store.load(
             &sid,
             &state.master_key,
-            state.config.memory.session_max_age_hours,
+            app_config.memory.session_max_age_hours,
         )? {
             agent.restore_conversation(persisted.messages);
         }
     }
+    drop(app_config);
 
     // Wire memory manager if available
     if let Some(ref mm) = state.memory_manager {
@@ -405,6 +456,185 @@ pub async fn audio_chat(
 
     Ok(axum::Json(AudioChatResponse {
         transcription: transcribed_text,
+        response,
+        session_id: agent.session_id().to_string(),
+        cost_usd: agent.current_cost_usd(),
+    }))
+}
+
+/// Build multimodal `Content` from text and image inputs.
+pub fn build_multimodal_content(text: &str, images: &[ImageInput]) -> Content {
+    let image_sources: Vec<ImageSource> = images
+        .iter()
+        .map(|img| ImageSource::Base64 {
+            media_type: img.media_type.clone(),
+            data: img.data.clone(),
+        })
+        .collect();
+    Content::from_text_and_images(text.to_string(), image_sources)
+}
+
+/// Allowed image MIME types for the multipart image upload endpoint.
+const ALLOWED_IMAGE_TYPES: &[&str] = &[
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+];
+
+/// `POST /chat/image` — upload images with a message, run an agent turn.
+///
+/// Accepts a multipart form with the following fields:
+/// - `message` (required): the user's text message
+/// - `images` (required, multiple): image files (PNG, JPEG, WebP, GIF)
+/// - `agent` (optional): agent profile name (defaults to `"aivyx"`)
+/// - `session_id` (optional): session to resume
+/// - `project` (optional): project context
+pub async fn image_chat(
+    State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
+    mut multipart: axum::extract::Multipart,
+) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
+    let mut message: Option<String> = None;
+    let mut images: Vec<ImageInput> = Vec::new();
+    let mut agent_name = String::from("aivyx");
+    let mut session_id: Option<String> = None;
+    let mut project: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ServerError(AivyxError::Http(format!("multipart error: {e}"))))?
+    {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "message" => {
+                let text = field.text().await.map_err(|e| {
+                    ServerError(AivyxError::Http(format!("failed to read message field: {e}")))
+                })?;
+                message = Some(text);
+            }
+            "images" => {
+                let content_type = field
+                    .content_type()
+                    .unwrap_or("application/octet-stream")
+                    .to_string();
+
+                // Validate MIME type
+                if !ALLOWED_IMAGE_TYPES.contains(&content_type.as_str()) {
+                    return Err(ServerError(AivyxError::Config(format!(
+                        "unsupported image type: {content_type}. Allowed: {}",
+                        ALLOWED_IMAGE_TYPES.join(", ")
+                    ))));
+                }
+
+                let bytes = field.bytes().await.map_err(|e| {
+                    ServerError(AivyxError::Http(format!("failed to read image field: {e}")))
+                })?;
+
+                use base64::Engine;
+                let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                images.push(ImageInput {
+                    media_type: content_type,
+                    data,
+                });
+            }
+            "agent" => {
+                let text = field.text().await.map_err(|e| {
+                    ServerError(AivyxError::Http(format!("failed to read agent field: {e}")))
+                })?;
+                if !text.is_empty() {
+                    agent_name = text;
+                }
+            }
+            "session_id" => {
+                let text = field.text().await.map_err(|e| {
+                    ServerError(AivyxError::Http(format!(
+                        "failed to read session_id field: {e}"
+                    )))
+                })?;
+                if !text.is_empty() {
+                    session_id = Some(text);
+                }
+            }
+            "project" => {
+                let text = field.text().await.map_err(|e| {
+                    ServerError(AivyxError::Http(format!(
+                        "failed to read project field: {e}"
+                    )))
+                })?;
+                if !text.is_empty() {
+                    project = Some(text);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let message = message.ok_or_else(|| {
+        ServerError(AivyxError::Config(
+            "missing required 'message' field in multipart form".into(),
+        ))
+    })?;
+
+    if images.is_empty() {
+        return Err(ServerError(AivyxError::Config(
+            "missing required 'images' field in multipart form".into(),
+        )));
+    }
+
+    // Create agent
+    let mut agent = state
+        .agent_session
+        .create_agent(&agent_name)
+        .await
+        .map_err(|e| match e {
+            AivyxError::Io(_) | AivyxError::Config(_) => ServerError(AivyxError::Config(format!(
+                "agent not found: {}",
+                agent_name
+            ))),
+            other => ServerError(other),
+        })?;
+
+    reject_non_autonomous(&agent)?;
+
+    let config = state.config.read().await;
+    if let Some(ref project_name) = project
+        && let Some(proj) = config.find_project(project_name)
+    {
+        agent.set_active_project(proj.clone());
+    }
+
+    if let Some(ref id_str) = session_id {
+        let sid: SessionId = id_str.parse().map_err(|_| {
+            ServerError(AivyxError::Config(format!("invalid session ID: {id_str}")))
+        })?;
+        if let Some(persisted) = state.session_store.load(
+            &sid,
+            &state.master_key,
+            config.memory.session_max_age_hours,
+        )? {
+            agent.restore_conversation(persisted.messages);
+        }
+    }
+    drop(config);
+
+    if let Some(ref mm) = state.memory_manager {
+        agent.set_memory_manager(mm.clone());
+    }
+
+    // Run the turn with multimodal content
+    let content = build_multimodal_content(&message, &images);
+    let response = agent.turn_with_content(content, None).await?;
+
+    // Save session
+    let persisted = agent.to_persisted_session();
+    if let Err(e) = state.session_store.save(&persisted, &state.master_key) {
+        tracing::warn!("failed to save session: {e}");
+    }
+
+    Ok(axum::Json(ChatResponse {
         response,
         session_id: agent.session_id().to_string(),
         cost_usd: agent.current_cost_usd(),
@@ -508,5 +738,50 @@ mod tests {
         assert_eq!(json["response"], "Hi there");
         assert_eq!(json["session_id"], "sess-1");
         assert!(json["cost_usd"].is_f64());
+    }
+
+    #[test]
+    fn chat_request_with_images_deserializes() {
+        let json = r#"{
+            "agent": "test",
+            "message": "What is in this image?",
+            "images": [
+                {"media_type": "image/png", "data": "iVBORw0KGgo="}
+            ]
+        }"#;
+        let req: ChatRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.message, "What is in this image?");
+        assert_eq!(req.images.len(), 1);
+        assert_eq!(req.images[0].media_type, "image/png");
+        assert_eq!(req.images[0].data, "iVBORw0KGgo=");
+    }
+
+    #[test]
+    fn chat_request_without_images_backward_compat() {
+        let json = r#"{"agent":"test","message":"hello"}"#;
+        let req: ChatRequest = serde_json::from_str(json).unwrap();
+        assert!(req.images.is_empty());
+    }
+
+    #[test]
+    fn build_multimodal_content_creates_blocks() {
+        let images = vec![
+            ImageInput {
+                media_type: "image/jpeg".into(),
+                data: "abc123".into(),
+            },
+        ];
+        let content = build_multimodal_content("describe this", &images);
+        assert!(content.has_images());
+        assert_eq!(content.text(), "describe this");
+        assert_eq!(content.image_sources().len(), 1);
+    }
+
+    #[test]
+    fn image_input_deserializes() {
+        let json = r#"{"media_type":"image/webp","data":"AAAA"}"#;
+        let input: ImageInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.media_type, "image/webp");
+        assert_eq!(input.data, "AAAA");
     }
 }

@@ -20,7 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
 use crate::validation::validate_name;
+use aivyx_tenant::AivyxRole;
 
 /// Summary item for schedule listing.
 #[derive(Debug, Serialize)]
@@ -44,7 +46,9 @@ pub struct ScheduleSummary {
 /// `GET /schedules` — list all configured schedule entries.
 pub async fn list_schedules(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
 
     let schedules: Vec<ScheduleSummary> = config
@@ -87,8 +91,10 @@ fn default_true() -> bool {
 /// `POST /schedules` — create a new schedule entry.
 pub async fn create_schedule(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::Json(req): axum::Json<CreateScheduleRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&req.name)?;
     aivyx_config::validate_cron(&req.cron)?;
 
@@ -114,8 +120,10 @@ pub async fn create_schedule(
 /// `DELETE /schedules/{name}` — remove a schedule entry.
 pub async fn delete_schedule(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     validate_name(&name)?;
 
     let mut config = aivyx_config::AivyxConfig::load(state.dirs.config_path())?;
@@ -143,7 +151,9 @@ pub struct NotificationItem {
 /// `GET /notifications` — list all pending notifications.
 pub async fn list_notifications(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let store = open_notification_store(&state)?;
     let schedule_key = build_schedule_key(&state)?;
 
@@ -165,7 +175,9 @@ pub async fn list_notifications(
 /// `DELETE /notifications` — drain all pending notifications.
 pub async fn drain_notifications(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let store = open_notification_store(&state)?;
     let schedule_key = build_schedule_key(&state)?;
 
@@ -215,9 +227,11 @@ pub struct RateNotificationRequest {
 /// agents use these ratings during reflection to self-improve.
 pub async fn rate_notification(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Path(id): Path<String>,
     axum::Json(req): axum::Json<RateNotificationRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Operator)?;
     let store = open_notification_store(&state)?;
     let schedule_key = build_schedule_key(&state)?;
 
@@ -265,8 +279,10 @@ pub struct HistoryQuery {
 /// human-assigned quality ratings. Supports filtering by agent and rating.
 pub async fn notification_history(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     axum::extract::Query(query): axum::extract::Query<HistoryQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let store = open_notification_store(&state)?;
     let schedule_key = build_schedule_key(&state)?;
 

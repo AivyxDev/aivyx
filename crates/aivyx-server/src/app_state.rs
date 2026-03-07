@@ -5,6 +5,7 @@
 //! and the hashed bearer token for authentication. Wrapped in `Arc` for
 //! Axum's `State` extractor.
 
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use aivyx_agent::{AgentSession, SessionStore};
 use aivyx_audit::AuditLog;
 use aivyx_config::server::RateLimitConfig;
 use aivyx_config::{AivyxConfig, AivyxDirs};
+use aivyx_core::a2a::PushNotificationConfig;
 use aivyx_crypto::MasterKey;
 use aivyx_memory::MemoryManager;
 use governor::clock::DefaultClock;
@@ -83,8 +85,10 @@ pub struct AppState {
     pub master_key: MasterKey,
     /// File system paths (`~/.aivyx/`).
     pub dirs: AivyxDirs,
-    /// System configuration.
-    pub config: AivyxConfig,
+    /// System configuration (wrapped in `RwLock` for hot-reload).
+    pub config: Arc<tokio::sync::RwLock<AivyxConfig>>,
+    /// Push notification configs for A2A tasks, keyed by task ID.
+    pub push_notification_configs: Arc<tokio::sync::RwLock<HashMap<String, PushNotificationConfig>>>,
     /// SHA-256 hash of the expected bearer token for constant-time comparison.
     /// Wrapped in `RwLock` to support runtime token rotation.
     pub bearer_token_hash: tokio::sync::RwLock<[u8; 32]>,
@@ -100,6 +104,16 @@ pub struct AppState {
     pub federation: Option<Arc<aivyx_federation::client::FederationClient>>,
     /// Prometheus metrics handle for rendering /metrics endpoint.
     pub prometheus_handle: Option<metrics_exporter_prometheus::PrometheusHandle>,
+    /// Tenant store for multi-tenancy (None in single-user mode).
+    pub tenant_store: Option<Arc<aivyx_tenant::TenantStore>>,
+    /// API key store for multi-tenancy (None in single-user mode).
+    pub api_key_store: Option<Arc<aivyx_tenant::ApiKeyStore>>,
+    /// Whether multi-tenant mode is enabled.
+    pub multi_tenant_enabled: bool,
+    /// Cost ledger for recording LLM usage (always present, even in single-user mode).
+    pub cost_ledger: Arc<aivyx_billing::CostLedger>,
+    /// Budget enforcer (None if no budget config).
+    pub budget_enforcer: Option<Arc<aivyx_billing::BudgetEnforcer>>,
 }
 
 #[cfg(test)]
@@ -118,6 +132,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("aivyx-state-test-{}", rand::random::<u64>()));
         std::fs::create_dir_all(dir.join("sessions")).unwrap();
         std::fs::create_dir_all(dir.join("agents")).unwrap();
+        std::fs::create_dir_all(dir.join("billing")).unwrap();
 
         let dirs = AivyxDirs::new(&dir);
         let config = AivyxConfig::default();
@@ -125,6 +140,9 @@ mod tests {
         let audit_key = derive_audit_key(&master_key);
         let audit_log = AuditLog::new(dir.join("audit.log"), &audit_key);
         let session_store = SessionStore::open(dir.join("sessions").join("sessions.db")).unwrap();
+        let cost_ledger = Arc::new(
+            aivyx_billing::CostLedger::open(dir.join("billing").join("costs.db")).unwrap(),
+        );
 
         let mk2 = MasterKey::from_bytes([42u8; 32]);
         let state = AppState {
@@ -134,13 +152,19 @@ mod tests {
             audit_log,
             master_key,
             dirs: AivyxDirs::new(&dir),
-            config,
+            config: Arc::new(tokio::sync::RwLock::new(config)),
+            push_notification_configs: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             bearer_token_hash: tokio::sync::RwLock::new([0u8; 32]),
             auth_rate_limiter: std::sync::Mutex::new(std::collections::HashMap::new()),
             sidecar_mode: false,
             endpoint_rate_limiters: None,
             federation: None,
             prometheus_handle: None,
+            tenant_store: None,
+            api_key_store: None,
+            multi_tenant_enabled: false,
+            cost_ledger,
+            budget_enforcer: None,
         };
 
         assert_eq!(*state.bearer_token_hash.blocking_read(), [0u8; 32]);

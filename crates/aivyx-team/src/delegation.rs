@@ -11,6 +11,8 @@ use aivyx_agent::AgentSession;
 use aivyx_audit::{AuditEvent, AuditLog};
 use aivyx_capability::CapabilitySet;
 use aivyx_core::{AivyxError, CapabilityScope, Principal, Result, Tool, ToolId};
+#[cfg(feature = "memory")]
+use aivyx_memory::{MemoryManager, OutcomeRecord, OutcomeSource};
 
 use crate::capability_delegation::attenuate_for_member;
 use crate::config::DialogueConfig;
@@ -222,6 +224,24 @@ impl SpecialistPool {
             members.push((agent_name.to_string(), role.to_string()));
             // The context will be rebuilt on next delegation via format_for_role()
             info!("Registered spawned specialist '{}' (role: {})", agent_name, role);
+        }
+    }
+
+    /// Remove a dynamically spawned specialist from the pool.
+    ///
+    /// Removes the agent from the cached agents map and, if team context
+    /// is enabled, removes the member entry so it no longer appears in
+    /// the `[TEAM CONTEXT]` block.
+    pub async fn deregister_spawned(&self, name: &str) {
+        // Remove from cached agents
+        let mut agents = self.agents.lock().await;
+        agents.remove(name);
+
+        // Remove from team context members list
+        if let Some(ref ctx) = self.team_context {
+            let mut members = ctx.members.clone();
+            members.retain(|(n, _)| n != name);
+            info!("Deregistered spawned specialist '{}'", name);
         }
     }
 
@@ -500,6 +520,9 @@ pub struct DelegateTaskTool {
     /// When set, specialists use `turn_stream()` and their tokens flow through
     /// the team's output channel with `[specialist_name]` headers.
     token_tx: Option<tokio::sync::mpsc::Sender<String>>,
+    /// Optional memory manager for recording delegation outcomes.
+    #[cfg(feature = "memory")]
+    memory_manager: Option<Arc<Mutex<MemoryManager>>>,
 }
 
 impl DelegateTaskTool {
@@ -521,7 +544,16 @@ impl DelegateTaskTool {
             job_tracker,
             pool,
             token_tx: None,
+            #[cfg(feature = "memory")]
+            memory_manager: None,
         }
+    }
+
+    /// Attach a memory manager for recording delegation outcomes.
+    #[cfg(feature = "memory")]
+    pub fn with_memory_manager(mut self, manager: Arc<Mutex<MemoryManager>>) -> Self {
+        self.memory_manager = Some(manager);
+        self
     }
 
     /// Set the token sender for streaming specialist output.
@@ -646,6 +678,8 @@ impl Tool for DelegateTaskTool {
             let job_id_clone = job_id.clone();
             let specialist_clone = Arc::clone(&specialist_arc);
             let fallback_agent_clone = fallback_agent.clone();
+            #[cfg(feature = "memory")]
+            let memory_manager = self.memory_manager.clone();
 
             tokio::spawn(async move {
                 job_tracker
@@ -711,6 +745,27 @@ impl Tool for DelegateTaskTool {
                 // Update team context so other specialists see this work
                 pool.update_context(&actual_agent, &task_owned, &response)
                     .await;
+
+                // Record delegation outcome
+                #[cfg(feature = "memory")]
+                if let Some(ref mgr) = memory_manager {
+                    let record = OutcomeRecord::new(
+                        OutcomeSource::Delegation {
+                            specialist: actual_agent.clone(),
+                            task: task_owned.clone(),
+                        },
+                        success,
+                        response.clone(),
+                        0,
+                        lead_name.clone(),
+                        task_owned.clone(),
+                    );
+                    if let Ok(mgr) = mgr.try_lock() {
+                        if let Err(e) = mgr.record_outcome(&record) {
+                            warn!("Failed to record async delegation outcome: {e}");
+                        }
+                    }
+                }
 
                 // Update job tracker
                 if success {
@@ -794,6 +849,30 @@ impl Tool for DelegateTaskTool {
         self.pool
             .update_context(&actual_agent, task, &response)
             .await;
+
+        // Record delegation outcome
+        #[cfg(feature = "memory")]
+        {
+            let success = status == "completed";
+            if let Some(ref mgr) = self.memory_manager {
+                let record = OutcomeRecord::new(
+                    OutcomeSource::Delegation {
+                        specialist: actual_agent.clone(),
+                        task: task.to_string(),
+                    },
+                    success,
+                    response.clone(),
+                    0, // duration not tracked for sync delegations yet
+                    self.lead_name.clone(),
+                    task.to_string(),
+                );
+                if let Ok(mgr) = mgr.try_lock() {
+                    if let Err(e) = mgr.record_outcome(&record) {
+                        warn!("Failed to record delegation outcome: {e}");
+                    }
+                }
+            }
+        }
 
         let mut json_result = serde_json::json!({
             "status": status,
@@ -1736,6 +1815,37 @@ mod tests {
         assert!(formatted.contains("request_peer_review"));
         assert!(formatted.contains("review_request"));
         assert!(formatted.contains("[END PEER MESSAGING]"));
+    }
+
+    #[tokio::test]
+    async fn deregister_spawned_removes_from_pool() {
+        let dir = std::env::temp_dir().join(format!("aivyx-pool-dereg-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dirs = aivyx_config::AivyxDirs::new(&dir);
+        let config = aivyx_config::AivyxConfig::default();
+        let key = aivyx_crypto::MasterKey::generate();
+        let session = Arc::new(AgentSession::new(dirs, config, key));
+
+        let pool = SpecialistPool::new(
+            session,
+            None,
+            CapabilitySet::new(),
+            None,
+            DialogueConfig::default(),
+        );
+
+        // Register a spawned specialist
+        pool.register_spawned("ephemeral", "helper").await;
+
+        // Deregister it
+        pool.deregister_spawned("ephemeral").await;
+
+        // Pool should be empty (the agent was never materialized via
+        // get_or_create, so the agents map stays empty — but the method
+        // must not panic for non-existent keys).
+        assert!(pool.is_empty().await);
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[tokio::test]

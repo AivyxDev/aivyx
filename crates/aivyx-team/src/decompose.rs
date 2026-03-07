@@ -145,16 +145,16 @@ impl Tool for DecomposeTaskTool {
         };
 
         let response = provider.chat(&request).await?;
-        let text = &response.message.content;
+        let content = &response.message.content;
 
-        if text.is_empty() {
+        if content.is_empty() {
             return Err(AivyxError::Agent(
                 "decompose_task: LLM returned empty response".into(),
             ));
         }
 
         // Parse the JSON response
-        let subtasks = parse_decomposition(text)?;
+        let subtasks = parse_decomposition(content.text())?;
 
         // Build parallel groups from the dependency graph
         let groups = compute_parallel_groups(&subtasks);

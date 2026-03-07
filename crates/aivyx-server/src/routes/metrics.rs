@@ -18,6 +18,8 @@ use aivyx_config::ModelPricing;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Query parameters for metrics endpoints.
 #[derive(Debug, Deserialize)]
@@ -54,8 +56,10 @@ pub async fn prometheus_metrics(
 /// `GET /metrics/summary` — aggregated metrics over the specified period.
 pub async fn metrics_summary(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Billing)?;
     let days = query.days.clamp(1, 30);
     let to = Utc::now();
     let from = to - Duration::days(days as i64);
@@ -75,8 +79,10 @@ pub async fn metrics_summary(
 /// `GET /metrics/timeline` — hourly buckets over the specified period.
 pub async fn metrics_timeline(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Billing)?;
     let days = query.days.clamp(1, 30);
     let to = Utc::now();
     let from = to - Duration::days(days as i64);
@@ -119,8 +125,10 @@ struct CostRollup {
 /// specified number of days.
 pub async fn cost_rollup(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Billing)?;
     let days = query.days.clamp(1, 30);
     let to = Utc::now();
     let from = to - Duration::days(days as i64);

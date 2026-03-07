@@ -1,0 +1,2977 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Aivyx Engine API",
+    "version": "1.1.0",
+    "description": "AI agent orchestration engine with multi-agent teams, A2A/MCP protocol support, and enterprise features.",
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Local development" },
+    { "url": "https://api.aivyx.ai", "description": "Production" }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Health and liveness checks" },
+    { "name": "Auth", "description": "Authentication and SSO" },
+    { "name": "Chat", "description": "Chat completion and streaming" },
+    { "name": "Agents", "description": "Agent CRUD and configuration" },
+    { "name": "Teams", "description": "Multi-agent team orchestration" },
+    { "name": "Tasks", "description": "Asynchronous task management" },
+    { "name": "Memory", "description": "Long-term memory and knowledge graph" },
+    { "name": "Audit", "description": "Tamper-evident audit log" },
+    { "name": "Sessions", "description": "Conversation session management" },
+    { "name": "Projects", "description": "Project workspaces" },
+    { "name": "Channels", "description": "Messaging channel adapters" },
+    { "name": "Schedules", "description": "Scheduled tasks and notifications" },
+    { "name": "Plugins", "description": "Plugin management" },
+    { "name": "Skills", "description": "Agent skill registry" },
+    { "name": "Tools", "description": "Tool discovery" },
+    { "name": "Config", "description": "Runtime configuration" },
+    { "name": "Secrets", "description": "Encrypted secret store" },
+    { "name": "Status", "description": "System status" },
+    { "name": "Metrics", "description": "Observability and cost metrics" },
+    { "name": "Admin", "description": "Administrative operations" },
+    { "name": "Tenants", "description": "Multi-tenant administration" },
+    { "name": "Workflows", "description": "Multi-stage workflow orchestration" },
+    { "name": "Usage", "description": "Usage and billing summaries" },
+    { "name": "Federation", "description": "Instance federation and relay" },
+    { "name": "A2A", "description": "Google A2A protocol endpoints" },
+    { "name": "Webhooks", "description": "Inbound webhook triggers" },
+    { "name": "Security", "description": "Security auditing and capability checks" },
+    { "name": "WebSocket", "description": "WebSocket connections" },
+    { "name": "Voice", "description": "Voice streaming via WebSocket" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ws": {
+      "get": {
+        "summary": "WebSocket connection",
+        "description": "Upgrade to WebSocket for real-time bidirectional communication. Authentication is performed in-band after connection.",
+        "tags": ["WebSocket"],
+        "security": [],
+        "responses": {
+          "101": { "description": "Switching protocols to WebSocket" }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "description": "Returns metrics in Prometheus exposition format.",
+        "tags": ["Metrics"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Prometheus metrics",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent.json": {
+      "get": {
+        "summary": "A2A Agent Card",
+        "description": "Public discovery endpoint per the Google A2A specification. Returns the agent card describing this instance's capabilities.",
+        "tags": ["A2A"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Agent card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{trigger_name}": {
+      "post": {
+        "summary": "Inbound webhook",
+        "description": "Receive an inbound webhook trigger, secured via HMAC signature verification.",
+        "tags": ["Webhooks"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "trigger_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Name of the webhook trigger to invoke"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Webhook processed" },
+          "404": {
+            "description": "Unknown trigger",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "SSO login",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string" },
+                  "token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "expires_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "SSO logout",
+        "tags": ["Auth"],
+        "security": [],
+        "responses": {
+          "204": { "description": "Logged out" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Current user info",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current user information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user_id": { "type": "string" },
+                    "email": { "type": "string" },
+                    "provider": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "summary": "Chat completion",
+        "description": "Send a message and receive a complete response. Rate-limited under the LLM tier.",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" },
+                  "agent": { "type": "string" },
+                  "session_id": { "type": "string" }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "response": { "type": "string" },
+                    "session_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/stream": {
+      "post": {
+        "summary": "Streaming chat",
+        "description": "Send a message and receive a streamed response via Server-Sent Events.",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" },
+                  "agent": { "type": "string" },
+                  "session_id": { "type": "string" }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of chat tokens",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/audio": {
+      "post": {
+        "summary": "Audio chat",
+        "description": "Send audio input for transcription and chat response. Maximum body size 10 MiB.",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audio": { "type": "string", "format": "binary" },
+                  "agent": { "type": "string" },
+                  "session_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat response from audio input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "response": { "type": "string" },
+                    "transcript": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/image": {
+      "post": {
+        "summary": "Image chat",
+        "description": "Send an image for vision-based chat. Maximum body size 20 MiB.",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": { "type": "string", "format": "binary" },
+                  "message": { "type": "string" },
+                  "agent": { "type": "string" },
+                  "session_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat response from image input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "response": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ws/voice": {
+      "get": {
+        "summary": "Voice WebSocket",
+        "description": "Upgrade to WebSocket for real-time voice streaming.",
+        "tags": ["Voice"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "101": { "description": "Switching protocols to WebSocket" }
+        }
+      }
+    },
+    "/teams/{name}/run": {
+      "post": {
+        "summary": "Run team",
+        "description": "Execute a multi-agent team run and return the complete result.",
+        "tags": ["Teams"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Team name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": { "type": "string" }
+                },
+                "required": ["input"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team run result",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{name}/run/stream": {
+      "post": {
+        "summary": "Stream team run",
+        "description": "Execute a multi-agent team run with SSE streaming output.",
+        "tags": ["Teams"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Team name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": { "type": "string" }
+                },
+                "required": ["input"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of team run events",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/digest": {
+      "post": {
+        "summary": "Generate digest",
+        "description": "Generate a digest summary from conversation history.",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "format": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated digest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "digest": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/search": {
+      "post": {
+        "summary": "Search memories",
+        "description": "Semantic search over stored memories. Rate-limited under the search tier.",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string" },
+                  "limit": { "type": "integer" },
+                  "tags": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Matching memories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MemoryEntry" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/profile/extract": {
+      "post": {
+        "summary": "Extract profile",
+        "description": "Extract user profile facts from conversation history.",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extracted profile data",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "summary": "List tasks",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Task" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create task",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": { "type": "string" },
+                  "prompt": { "type": "string" }
+                },
+                "required": ["prompt"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Task" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "summary": "Get task",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Task" }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete task",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Task deleted" }
+        }
+      }
+    },
+    "/tasks/{id}/resume": {
+      "post": {
+        "summary": "Resume task",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Task resumed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Task" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{id}/cancel": {
+      "post": {
+        "summary": "Cancel task",
+        "tags": ["Tasks"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task cancelled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Task" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/a2a": {
+      "post": {
+        "summary": "A2A JSON-RPC handler",
+        "description": "Handle A2A protocol JSON-RPC 2.0 requests for task operations.",
+        "tags": ["A2A"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jsonrpc": { "type": "string", "const": "2.0" },
+                  "method": { "type": "string" },
+                  "id": { "type": ["string", "integer"] },
+                  "params": { "type": "object" }
+                },
+                "required": ["jsonrpc", "method", "id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/a2a/stream": {
+      "post": {
+        "summary": "A2A SSE streaming",
+        "description": "Handle A2A tasks/sendSubscribe with SSE streaming responses.",
+        "tags": ["A2A"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jsonrpc": { "type": "string", "const": "2.0" },
+                  "method": { "type": "string" },
+                  "id": { "type": ["string", "integer"] },
+                  "params": { "type": "object" }
+                },
+                "required": ["jsonrpc", "method", "id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of A2A events",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "summary": "List agents",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Agent" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create agent",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Agent" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Agent" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{name}": {
+      "get": {
+        "summary": "Get agent",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Agent" }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update agent",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Agent" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Agent" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete agent",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Agent deleted" }
+        }
+      }
+    },
+    "/agents/{name}/duplicate": {
+      "post": {
+        "summary": "Duplicate agent",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name to duplicate"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Agent duplicated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Agent" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{name}/capabilities": {
+      "put": {
+        "summary": "Update capabilities",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "capabilities": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Capabilities updated" }
+        }
+      }
+    },
+    "/agents/{name}/persona": {
+      "get": {
+        "summary": "Get persona",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent persona",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch persona",
+        "tags": ["Agents"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Agent name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Persona updated" }
+        }
+      }
+    },
+    "/teams": {
+      "get": {
+        "summary": "List teams",
+        "tags": ["Teams"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of teams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{name}": {
+      "get": {
+        "summary": "Get team",
+        "tags": ["Teams"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Team name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team details",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "404": {
+            "description": "Team not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{name}/sessions": {
+      "get": {
+        "summary": "List team sessions",
+        "tags": ["Teams"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Team name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of team sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory": {
+      "get": {
+        "summary": "List memories",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of memories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MemoryEntry" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/{id}": {
+      "delete": {
+        "summary": "Delete memory",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Memory entry ID"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Memory deleted" }
+        }
+      }
+    },
+    "/memory/stats": {
+      "get": {
+        "summary": "Memory stats",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Memory statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": { "type": "integer" },
+                    "by_kind": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/triples": {
+      "get": {
+        "summary": "List triples",
+        "description": "List knowledge graph triples (subject-predicate-object).",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of triples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "subject": { "type": "string" },
+                      "predicate": { "type": "string" },
+                      "object": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/graph": {
+      "get": {
+        "summary": "Full knowledge graph",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Complete knowledge graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": { "type": "array", "items": { "type": "object" } },
+                    "edges": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/graph/entity/{name}": {
+      "get": {
+        "summary": "Entity subgraph",
+        "description": "Get the knowledge graph subgraph centered on a specific entity.",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Entity name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity subgraph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": { "type": "array", "items": { "type": "object" } },
+                    "edges": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/graph/communities": {
+      "get": {
+        "summary": "Graph communities",
+        "description": "Detect and return community clusters within the knowledge graph.",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Community clusters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/graph/path": {
+      "get": {
+        "summary": "Find path",
+        "description": "Find a path between two entities in the knowledge graph.",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Source entity name"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Target entity name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Path between entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/profile": {
+      "get": {
+        "summary": "Get profile",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update profile",
+        "tags": ["Memory"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Profile updated" }
+        }
+      }
+    },
+    "/audit": {
+      "get": {
+        "summary": "Recent audit entries",
+        "tags": ["Audit"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Recent audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AuditEntry" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/verify": {
+      "post": {
+        "summary": "Verify audit chain",
+        "description": "Verify the integrity of the tamper-evident audit log chain.",
+        "tags": ["Audit"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": { "type": "boolean" },
+                    "entries_checked": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/search": {
+      "get": {
+        "summary": "Search audit",
+        "tags": ["Audit"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Search query"
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by event type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching audit entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AuditEntry" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/capability-audit": {
+      "get": {
+        "summary": "Capability audit report",
+        "description": "Generate an audit report of agent capability assignments and usage.",
+        "tags": ["Security"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Capability audit report",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "summary": "List sessions",
+        "tags": ["Sessions"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of conversation sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "agent": { "type": "string" },
+                      "created_at": { "type": "string", "format": "date-time" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "delete": {
+        "summary": "Delete session",
+        "tags": ["Sessions"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Session ID"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Session deleted" }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "summary": "List projects",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "created_at": { "type": "string", "format": "date-time" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Project created" }
+        }
+      }
+    },
+    "/projects/{name}": {
+      "delete": {
+        "summary": "Delete project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Project name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Project deleted" }
+        }
+      }
+    },
+    "/channels": {
+      "get": {
+        "summary": "List channels",
+        "tags": ["Channels"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Channel" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create channel",
+        "tags": ["Channels"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Channel" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Channel created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Channel" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/channels/{name}": {
+      "get": {
+        "summary": "Get channel",
+        "tags": ["Channels"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Channel name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Channel" }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update channel",
+        "tags": ["Channels"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Channel name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Channel" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Channel updated" }
+        }
+      },
+      "delete": {
+        "summary": "Delete channel",
+        "tags": ["Channels"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Channel name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Channel deleted" }
+        }
+      }
+    },
+    "/schedules": {
+      "get": {
+        "summary": "List schedules",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Schedule" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create schedule",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Schedule" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Schedule created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Schedule" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{name}": {
+      "delete": {
+        "summary": "Delete schedule",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Schedule name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Schedule deleted" }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "List notifications",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Pending notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Drain notifications",
+        "description": "Drain all pending notifications, returning them and marking them as read.",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Drained notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/history": {
+      "get": {
+        "summary": "Notification history",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Historical notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{id}/rating": {
+      "put": {
+        "summary": "Rate notification",
+        "tags": ["Schedules"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Notification ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rating": { "type": "integer", "minimum": 1, "maximum": 5 }
+                },
+                "required": ["rating"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Rating saved" }
+        }
+      }
+    },
+    "/plugins": {
+      "get": {
+        "summary": "List plugins",
+        "tags": ["Plugins"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of installed plugins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Install plugin",
+        "tags": ["Plugins"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "source": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Plugin installed" }
+        }
+      }
+    },
+    "/plugins/{name}": {
+      "delete": {
+        "summary": "Remove plugin",
+        "tags": ["Plugins"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Plugin name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Plugin removed" }
+        }
+      }
+    },
+    "/plugins/templates": {
+      "get": {
+        "summary": "List templates",
+        "description": "List available plugin templates.",
+        "tags": ["Plugins"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of plugin templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/skills": {
+      "get": {
+        "summary": "List skills",
+        "tags": ["Skills"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of skills",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/skills/effectiveness": {
+      "get": {
+        "summary": "Skill effectiveness scores",
+        "tags": ["Skills"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Effectiveness scores for all skills",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/skills/{name}": {
+      "get": {
+        "summary": "Get skill",
+        "tags": ["Skills"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Skill name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Skill details",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "404": {
+            "description": "Skill not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete skill",
+        "tags": ["Skills"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Skill name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Skill deleted" }
+        }
+      }
+    },
+    "/tools": {
+      "get": {
+        "summary": "List tools",
+        "tags": ["Tools"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of available tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config": {
+      "get": {
+        "summary": "Get config",
+        "tags": ["Config"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current configuration",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch config",
+        "description": "Partially update the runtime configuration.",
+        "tags": ["Config"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Configuration updated" }
+        }
+      }
+    },
+    "/secrets": {
+      "get": {
+        "summary": "List secrets",
+        "description": "List secret names (values are never returned).",
+        "tags": ["Secrets"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of secret names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Set secret",
+        "tags": ["Secrets"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["name", "value"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Secret stored" }
+        }
+      }
+    },
+    "/secrets/{name}": {
+      "delete": {
+        "summary": "Delete secret",
+        "tags": ["Secrets"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Secret name"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Secret deleted" }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "System status",
+        "tags": ["Status"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "System status overview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": { "type": "string" },
+                    "uptime_seconds": { "type": "integer" },
+                    "agents": { "type": "integer" },
+                    "sessions": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/summary": {
+      "get": {
+        "summary": "Metrics summary",
+        "tags": ["Metrics"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Aggregated metrics summary",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/timeline": {
+      "get": {
+        "summary": "Metrics timeline",
+        "tags": ["Metrics"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Time-series metrics data",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/costs": {
+      "get": {
+        "summary": "Cost rollup",
+        "description": "Aggregated cost data across LLM providers.",
+        "tags": ["Metrics"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Cost rollup",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/rotate-token": {
+      "post": {
+        "summary": "Rotate bearer token",
+        "description": "Generate a new bearer token, invalidating the current one.",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "New bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenants": {
+      "get": {
+        "summary": "List tenants",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of tenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Tenant" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create tenant",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tenant created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Tenant" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenants/{id}": {
+      "get": {
+        "summary": "Get tenant",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Tenant" }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete tenant",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "204": { "description": "Tenant deleted" }
+        }
+      }
+    },
+    "/tenants/{id}/suspend": {
+      "post": {
+        "summary": "Suspend tenant",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Tenant suspended" }
+        }
+      }
+    },
+    "/tenants/{id}/unsuspend": {
+      "post": {
+        "summary": "Unsuspend tenant",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Tenant unsuspended" }
+        }
+      }
+    },
+    "/tenants/{id}/keys": {
+      "get": {
+        "summary": "List API keys",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of API keys for the tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key_id": { "type": "string" },
+                      "prefix": { "type": "string" },
+                      "created_at": { "type": "string", "format": "date-time" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create API key",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "API key created (the full key is only returned once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key_id": { "type": "string" },
+                    "key": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenants/{id}/keys/{key_id}": {
+      "delete": {
+        "summary": "Revoke API key",
+        "tags": ["Tenants"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant ID"
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "API key ID to revoke"
+          }
+        ],
+        "responses": {
+          "204": { "description": "API key revoked" }
+        }
+      }
+    },
+    "/workflows": {
+      "get": {
+        "summary": "List workflows",
+        "tags": ["Workflows"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of workflows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Workflow" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create workflow",
+        "tags": ["Workflows"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Workflow" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Workflow created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Workflow" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{id}": {
+      "get": {
+        "summary": "Get workflow",
+        "tags": ["Workflows"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Workflow ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workflow details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Workflow" }
+              }
+            }
+          },
+          "404": {
+            "description": "Workflow not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{id}/pause": {
+      "post": {
+        "summary": "Pause workflow",
+        "tags": ["Workflows"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Workflow ID"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Workflow paused" }
+        }
+      }
+    },
+    "/workflows/{id}/resume": {
+      "post": {
+        "summary": "Resume workflow",
+        "tags": ["Workflows"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Workflow ID"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Workflow resumed" }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "summary": "Usage summary",
+        "tags": ["Usage"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Usage summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_tokens": { "type": "integer" },
+                    "total_cost_usd": { "type": "number" },
+                    "period": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage/daily": {
+      "get": {
+        "summary": "Daily usage",
+        "tags": ["Usage"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Daily usage breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": { "type": "string", "format": "date" },
+                      "tokens": { "type": "integer" },
+                      "cost_usd": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/ping": {
+      "get": {
+        "summary": "Federation ping",
+        "description": "Ping the federation subsystem to verify connectivity.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Pong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instance_id": { "type": "string" },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/peers": {
+      "get": {
+        "summary": "List peers",
+        "description": "List known federation peers and their status.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of federation peers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "url": { "type": "string" },
+                      "status": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/peers/{id}/agents": {
+      "get": {
+        "summary": "Peer agents",
+        "description": "List agents available on a specific federation peer.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Peer ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agents on the peer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Agent" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/relay/chat": {
+      "post": {
+        "summary": "Relay chat",
+        "description": "Relay a chat request to a federated peer instance.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "peer_id": { "type": "string" },
+                  "agent": { "type": "string" },
+                  "message": { "type": "string" }
+                },
+                "required": ["peer_id", "message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Relayed chat response",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/relay/task": {
+      "post": {
+        "summary": "Relay task",
+        "description": "Relay a task to a federated peer instance.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "peer_id": { "type": "string" },
+                  "prompt": { "type": "string" }
+                },
+                "required": ["peer_id", "prompt"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Task relayed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Task" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/federation/search": {
+      "post": {
+        "summary": "Federated search",
+        "description": "Search across federated peer instances.",
+        "tags": ["Federation"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string" }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Federated search results",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "summary": "OpenAPI specification",
+        "description": "Returns this OpenAPI 3.1.0 specification document.",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI specification",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token or multi-tenant API key"
+      }
+    },
+    "schemas": {
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Unique agent name" },
+          "role": { "type": "string", "description": "Agent role description" },
+          "model": { "type": "string", "description": "LLM model identifier" },
+          "system_prompt": { "type": "string", "description": "System prompt for the agent" }
+        },
+        "required": ["name"]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Unique task identifier" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "completed", "failed", "cancelled"],
+            "description": "Current task status"
+          },
+          "steps": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Task execution steps"
+          }
+        },
+        "required": ["id", "status"]
+      },
+      "MemoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Memory entry identifier" },
+          "kind": { "type": "string", "description": "Memory kind (fact, episode, etc.)" },
+          "content": { "type": "string", "description": "Memory content text" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Associated tags"
+          },
+          "relevance": { "type": "number", "description": "Relevance score (0.0-1.0)" }
+        },
+        "required": ["id", "kind", "content"]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time", "description": "When the event occurred" },
+          "event_type": { "type": "string", "description": "Type of audit event" },
+          "details": { "type": "object", "description": "Event-specific details" }
+        },
+        "required": ["timestamp", "event_type"]
+      },
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Unique channel name" },
+          "adapter_type": { "type": "string", "description": "Adapter type (slack, discord, matrix, etc.)" }
+        },
+        "required": ["name", "adapter_type"]
+      },
+      "Schedule": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Unique schedule name" },
+          "cron": { "type": "string", "description": "Cron expression" },
+          "agent": { "type": "string", "description": "Agent to invoke" },
+          "prompt": { "type": "string", "description": "Prompt to send to the agent" }
+        },
+        "required": ["name", "cron", "agent", "prompt"]
+      },
+      "Tenant": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Unique tenant identifier" },
+          "name": { "type": "string", "description": "Tenant name" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended"],
+            "description": "Tenant status"
+          },
+          "quotas": { "type": "object", "description": "Resource quotas" }
+        },
+        "required": ["id", "name", "status"]
+      },
+      "Workflow": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Unique workflow identifier" },
+          "name": { "type": "string", "description": "Workflow name" },
+          "stages": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Workflow stages"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "paused", "completed", "failed"],
+            "description": "Current workflow status"
+          }
+        },
+        "required": ["id", "name", "status"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "Error code" },
+          "message": { "type": "string", "description": "Human-readable error message" }
+        },
+        "required": ["error", "message"]
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ]
+}

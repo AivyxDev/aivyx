@@ -2,8 +2,11 @@
 members = [
     "crates/aivyx-engine-cli",
     "crates/aivyx-server",
+    "crates/aivyx-sso",
     "crates/aivyx-task",
     "crates/aivyx-team",
+    "crates/aivyx-tenant",
+    "crates/aivyx-billing",
     "crates/aivyx-integration-tests",
 ]
 resolver = "3"
@@ -32,6 +35,9 @@ aivyx-federation = { git = "ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core
 aivyx-server = { path = "crates/aivyx-server" }
 aivyx-task = { path = "crates/aivyx-task" }
 aivyx-team = { path = "crates/aivyx-team" }
+aivyx-tenant = { path = "crates/aivyx-tenant" }
+aivyx-billing = { path = "crates/aivyx-billing" }
+aivyx-sso = { path = "crates/aivyx-sso" }
 
 # ─── External dependencies ───────────────────────────────────────
 # Serialization
@@ -47,6 +53,7 @@ thiserror = "2"
 # Crypto
 secrecy = { version = "0.10", features = ["serde"] }
 sha2 = "0.10"
+hmac = "0.12"
 hex = "0.4"
 subtle = "2"
 base64 = "0.22"
@@ -97,3 +104,17 @@ flate2 = "1"
 
 # Crypto (engine CLI)
 zeroize = { version = "1", features = ["derive"] }
+
+# ─── Local path overrides for offline development ───────────────
+# Point git deps to the local checkout so unpushed changes are visible.
+[patch."ssh://git@aivyx-gitea.cloud:2222/AivyxDev/aivyx-core.git"]
+aivyx-core = { path = "../aivyx-core/crates/aivyx-core" }
+aivyx-crypto = { path = "../aivyx-core/crates/aivyx-crypto" }
+aivyx-config = { path = "../aivyx-core/crates/aivyx-config" }
+aivyx-audit = { path = "../aivyx-core/crates/aivyx-audit" }
+aivyx-capability = { path = "../aivyx-core/crates/aivyx-capability" }
+aivyx-llm = { path = "../aivyx-core/crates/aivyx-llm" }
+aivyx-mcp = { path = "../aivyx-core/crates/aivyx-mcp" }
+aivyx-memory = { path = "../aivyx-core/crates/aivyx-memory" }
+aivyx-agent = { path = "../aivyx-core/crates/aivyx-agent" }
+aivyx-federation = { path = "../aivyx-core/crates/aivyx-federation" }

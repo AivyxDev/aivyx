@@ -13,6 +13,8 @@ use serde::Deserialize;
 
 use crate::app_state::AppState;
 use crate::error::ServerError;
+use crate::extractors::AuthContextExt;
+use aivyx_tenant::AivyxRole;
 
 /// Query parameters for `GET /tools`.
 #[derive(Debug, Deserialize)]
@@ -28,8 +30,10 @@ pub struct ToolsQuery {
 /// Optionally filter by agent profile's allowed tool list.
 pub async fn list_tools(
     State(state): State<Arc<AppState>>,
+    auth: AuthContextExt,
     Query(query): Query<ToolsQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
+    auth.require_role(AivyxRole::Viewer)?;
     let mut registry = ToolRegistry::new();
 
     // Determine which tool names to register

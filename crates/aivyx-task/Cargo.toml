@@ -12,6 +12,7 @@ aivyx-agent = { workspace = true }
 aivyx-audit = { workspace = true }
 aivyx-config = { workspace = true }
 aivyx-llm = { workspace = true }
+aivyx-memory = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -23,6 +24,7 @@ tracing = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+uuid = { workspace = true }
 
 [[bench]]
 name = "planning"

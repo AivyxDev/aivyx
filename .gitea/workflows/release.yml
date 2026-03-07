@@ -42,10 +42,6 @@ jobs:
             -f deploy/desktop/Dockerfile.build \
             .
 
-      - name: Clean up secrets
-        if: always()
-        run: rm -f .ci_ssh_key .ci_known_hosts
-
       - name: Extract artifacts
         run: |
           VERSION="${{ github.ref_name }}"
@@ -61,6 +57,45 @@ jobs:
           ls -lh artifacts/*.deb artifacts/*.AppImage artifacts/*.tar.gz artifacts/*.sha256 artifacts/aivyx-desktop-linux-x86_64 2>/dev/null
           echo "✓ Artifacts extracted"
 
+      - name: Build aarch64-linux binary (cross-compile)
+        run: |
+          VERSION="${{ github.ref_name }}"
+          docker run --rm \
+            -v "$PWD":/build \
+            -v "$PWD/.ci_ssh_key":/root/.ssh/id_ed25519:ro \
+            -v "$PWD/.ci_known_hosts":/root/.ssh/known_hosts:ro \
+            -e CARGO_NET_GIT_FETCH_WITH_CLI=true \
+            -w /build \
+            rust:1.93-bookworm \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq && apt-get install -y -qq \
+                pkg-config libssl-dev openssh-client \
+                gcc-aarch64-linux-gnu libc6-dev-arm64-cross > /dev/null 2>&1
+
+              rustup target add aarch64-unknown-linux-gnu
+
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+              export PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu
+
+              cargo build --release --target aarch64-unknown-linux-gnu -p aivyx-engine-cli
+
+              mkdir -p /build/artifacts
+              cp target/aarch64-unknown-linux-gnu/release/aivyx /build/artifacts/aivyx-aarch64
+              cd /build/artifacts
+              tar czf aivyx-linux-aarch64.tar.gz aivyx-aarch64
+              sha256sum aivyx-linux-aarch64.tar.gz | awk "{print \$1}" > aivyx-linux-aarch64.tar.gz.sha256
+              rm aivyx-aarch64
+              echo "✓ aarch64 build complete"
+            '
+
+      # NOTE: macOS builds (x86_64-apple-darwin, aarch64-apple-darwin) require
+      # a macOS runner. See docs/BUILDING.md for local cross-compilation.
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f .ci_ssh_key .ci_known_hosts
+
       - name: Verify binaries are portable
         run: |
           # Ensure the binary uses standard glibc, not Nix store paths
@@ -75,6 +110,13 @@ jobs:
           fi
           echo "✓ Binary is portable"
           rm -f /tmp/aivyx
+
+      - name: Generate release checksums
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz *.deb *.AppImage 2>/dev/null | sort > checksums.txt
+          echo "=== Release Checksums ==="
+          cat checksums.txt
 
   # ─── 2. Deploy Artifacts to Website ───────────────────────────────
   deploy-releases:
@@ -94,7 +136,10 @@ jobs:
                    artifacts/aivyx-desktop.deb \
                    artifacts/aivyx-desktop-linux-x86_64 \
                    artifacts/aivyx-linux-x86_64.tar.gz \
-                   artifacts/aivyx-linux-x86_64.tar.gz.sha256; do
+                   artifacts/aivyx-linux-x86_64.tar.gz.sha256 \
+                   artifacts/aivyx-linux-aarch64.tar.gz \
+                   artifacts/aivyx-linux-aarch64.tar.gz.sha256 \
+                   artifacts/checksums.txt; do
             if [ -f "$f" ]; then
               echo "Uploading $(basename $f)..."
               scp -o ConnectTimeout=10 "$f" aivyx-studio:/home/aivyx/releases/${VERSION}/
