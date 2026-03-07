@@ -143,10 +143,8 @@ impl ApiKeyStore {
                 if record.revoked {
                     return Ok(None);
                 }
-                if let Some(exp) = record.expires_at {
-                    if now > exp {
-                        return Ok(None);
-                    }
+                if record.expires_at.is_some_and(|exp| now > exp) {
+                    return Ok(None);
                 }
                 return Ok(Some(record));
             }

@@ -41,7 +41,7 @@ pub enum TenantStatus {
 }
 
 /// Configurable resource limits per tenant.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResourceQuotas {
     /// Maximum number of agents the tenant can create.
     #[serde(default)]
@@ -58,18 +58,6 @@ pub struct ResourceQuotas {
     /// Maximum LLM tokens per month.
     #[serde(default)]
     pub max_llm_tokens_per_month: Option<u64>,
-}
-
-impl Default for ResourceQuotas {
-    fn default() -> Self {
-        Self {
-            max_agents: None,
-            max_sessions_per_day: None,
-            max_storage_mb: None,
-            max_llm_tokens_per_day: None,
-            max_llm_tokens_per_month: None,
-        }
-    }
 }
 
 /// Key prefix for tenant records in `EncryptedStore`.
