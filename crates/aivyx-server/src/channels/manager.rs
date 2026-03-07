@@ -585,6 +585,7 @@ mod tests {
             sidecar_mode: false,
             endpoint_rate_limiters: None,
             federation: None,
+            prometheus_handle: None,
         })
     }
 }

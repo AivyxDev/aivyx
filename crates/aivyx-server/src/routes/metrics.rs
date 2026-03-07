@@ -28,6 +28,26 @@ fn default_days() -> u64 {
     7
 }
 
+/// `GET /metrics` — Prometheus exposition format.
+///
+/// Public endpoint (no auth) for Prometheus scraping.
+pub async fn prometheus_metrics(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    match &state.prometheus_handle {
+        Some(handle) => (
+            [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+            handle.render(),
+        )
+            .into_response(),
+        None => (
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            "Prometheus metrics not initialized",
+        )
+            .into_response(),
+    }
+}
+
 /// `GET /metrics/summary` — aggregated metrics over the specified period.
 pub async fn metrics_summary(
     State(state): State<Arc<AppState>>,

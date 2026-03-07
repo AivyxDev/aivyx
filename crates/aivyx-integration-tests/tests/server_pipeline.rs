@@ -58,6 +58,7 @@ fn setup_test_state() -> (Arc<AppState>, std::path::PathBuf) {
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation: None,
+        prometheus_handle: None,
     });
 
     (state, dir)

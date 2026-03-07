@@ -1518,6 +1518,7 @@ async fn server_path_traversal_prevention() {
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation: None,
+        prometheus_handle: None,
     });
 
     // Test path traversal attempts

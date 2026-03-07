@@ -35,6 +35,8 @@ fn rate_limit_response(retry_after_secs: u64) -> Response {
 
 /// Log a rate limit event to the audit log.
 fn log_rate_limit(audit_log: &AuditLog, remote_addr: &str, tier: &str, path: &str) {
+    metrics::counter!("rate_limit_rejections_total", "tier" => tier.to_string()).increment(1);
+
     let _ = audit_log.append(AuditEvent::RateLimitExceeded {
         remote_addr: remote_addr.to_string(),
         tier: tier.to_string(),

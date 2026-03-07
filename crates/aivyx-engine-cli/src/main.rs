@@ -8,10 +8,21 @@ use clap::Parser;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    let env_filter = tracing_subscriber::EnvFilter::from_default_env();
+
+    if std::env::var("AIVYX_LOG_FORMAT").map_or(false, |v| v == "json") {
+        tracing_subscriber::fmt()
+            .json()
+            .with_writer(std::io::stderr)
+            .with_env_filter(env_filter)
+            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .with_env_filter(env_filter)
+            .init();
+    }
 
     let cli = app::Cli::parse();
 

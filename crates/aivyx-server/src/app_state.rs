@@ -98,6 +98,8 @@ pub struct AppState {
     /// Federation client for cross-instance agent communication.
     /// `None` when federation is not configured.
     pub federation: Option<Arc<aivyx_federation::client::FederationClient>>,
+    /// Prometheus metrics handle for rendering /metrics endpoint.
+    pub prometheus_handle: Option<metrics_exporter_prometheus::PrometheusHandle>,
 }
 
 #[cfg(test)]
@@ -138,6 +140,7 @@ mod tests {
             sidecar_mode: false,
             endpoint_rate_limiters: None,
             federation: None,
+            prometheus_handle: None,
         };
 
         assert_eq!(*state.bearer_token_hash.blocking_read(), [0u8; 32]);

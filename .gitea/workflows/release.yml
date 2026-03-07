@@ -29,19 +29,8 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           echo "Building ${VERSION}..."
-
-          # Pass the runner's SSH key so cargo can fetch private deps
-          SSH_KEY=""
-          for key in /root/.ssh/id_ed25519 /home/aivyx/.ssh/id_ed25519; do
-            if [ -f "$key" ]; then
-              SSH_KEY="$(cat "$key")"
-              break
-            fi
-          done
-
           docker build \
             --no-cache \
-            --build-arg "SSH_PRIVATE_KEY=${SSH_KEY}" \
             -t aivyx-builder:${VERSION} \
             -f deploy/desktop/Dockerfile.build \
             .

@@ -28,7 +28,11 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     // Public routes (no auth required — WebSocket authenticates in-band)
     let public = axum::Router::new()
         .route("/health", axum::routing::get(routes::health::health))
-        .route("/ws", axum::routing::get(routes::ws::ws_handler));
+        .route("/ws", axum::routing::get(routes::ws::ws_handler))
+        .route(
+            "/metrics",
+            axum::routing::get(routes::metrics::prometheus_metrics),
+        );
 
     // --- Rate-limited tiers (inside auth layer) ---
 
@@ -293,6 +297,28 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .layer(axum::middleware::from_fn(
             middleware::security::security_headers,
         ))
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(|request: &axum::http::Request<_>| {
+                    let request_id = uuid::Uuid::new_v4();
+                    tracing::info_span!(
+                        "http_request",
+                        request_id = %request_id,
+                        method = %request.method(),
+                        path = %request.uri().path(),
+                    )
+                })
+                .on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
+                    let status = response.status().as_u16().to_string();
+                    metrics::counter!("http_requests_total", "status" => status).increment(1);
+                    metrics::histogram!("http_request_duration_seconds").record(latency.as_secs_f64());
+                    tracing::info!(
+                        status = %response.status().as_u16(),
+                        latency_ms = %latency.as_millis(),
+                        "response"
+                    );
+                }),
+        )
         .layer(cors)
         .with_state(state)
 }
@@ -424,6 +450,7 @@ pub fn build_app_state(
         sidecar_mode: false,
         endpoint_rate_limiters: None,
         federation: None,
+        prometheus_handle: None,
     };
 
     Ok(Arc::new(state))
@@ -463,6 +490,11 @@ pub fn build_app_state_with_keys(
         .and_then(|s| s.rate_limit.as_ref())
         .map(EndpointRateLimiters::from_config);
 
+    // Install Prometheus metrics recorder
+    let prometheus_handle = metrics_exporter_prometheus::PrometheusBuilder::new()
+        .install_recorder()
+        .ok();
+
     let state = AppState {
         agent_session: Arc::new(AgentSession::new(agent_dirs, agent_config, agent_key)),
         session_store,
@@ -476,6 +508,7 @@ pub fn build_app_state_with_keys(
         sidecar_mode,
         endpoint_rate_limiters,
         federation: None,
+        prometheus_handle,
     };
 
     Ok(Arc::new(state))

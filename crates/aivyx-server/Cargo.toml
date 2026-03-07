@@ -39,6 +39,8 @@ uuid = { workspace = true }
 async-trait = { workspace = true }
 tokio-util = { workspace = true }
 governor = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
 aivyx-federation = { workspace = true }
 
 [dev-dependencies]

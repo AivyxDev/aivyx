@@ -117,6 +117,9 @@ fn is_rate_limited(state: &AppState, ip: std::net::IpAddr) -> bool {
 
 /// Record a failed authentication attempt for rate limiting and audit.
 fn record_auth_failure(state: &AppState, remote_addr: &str, reason: &str) {
+    // Prometheus counter
+    metrics::counter!("auth_failures_total", "reason" => reason.to_string()).increment(1);
+
     // Audit log
     if let Err(e) = state.audit_log.append(AuditEvent::HttpAuthFailed {
         remote_addr: remote_addr.to_string(),

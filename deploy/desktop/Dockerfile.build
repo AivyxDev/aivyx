@@ -39,15 +39,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# ── SSH setup for private Git dependencies ──────────────────────────
-# The SSH key is passed in at build time from the CI runner
-ARG SSH_PRIVATE_KEY=""
-RUN mkdir -p /root/.ssh && \
-    ssh-keyscan -p 2222 aivyx-gitea.cloud >> /root/.ssh/known_hosts 2>/dev/null && \
-    if [ -n "$SSH_PRIVATE_KEY" ]; then \
-      echo "$SSH_PRIVATE_KEY" > /root/.ssh/id_ed25519 && \
-      chmod 600 /root/.ssh/id_ed25519; \
-    fi
+# ── Git URL rewrite: SSH → HTTPS for private dependencies ───────────
+# Cargo's built-in libssh2 doesn't use standard known_hosts, so we
+# rewrite SSH git URLs to HTTPS (aivyx-core is public on Gitea).
+RUN git config --global url."https://aivyx-gitea.cloud/".insteadOf "ssh://git@aivyx-gitea.cloud:2222/"
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
 # ── Copy source ─────────────────────────────────────────────────────
 WORKDIR /build
