@@ -1,6 +1,12 @@
-/target
+**/target/
 
 # CI build secrets (temporary, cleaned up after build)
 .ci_ssh_key
 .ci_known_hosts
 node_modules
+
+# Desktop app binary sidecars (built/downloaded locally)
+apps/desktop/src-tauri/binaries/
+
+# SDK build output
+sdk/typescript/dist/
